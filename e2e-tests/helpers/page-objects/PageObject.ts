@@ -30,6 +30,7 @@ import { ModelPicker } from "./components/ModelPicker";
 import { Settings } from "./components/Settings";
 import { AppManagement } from "./components/AppManagement";
 import { PromptLibrary } from "./components/PromptLibrary";
+import { FileTree } from "./components/FileTree";
 
 // Import dialog page objects
 import { ContextFilesPickerDialog } from "./dialogs/ContextFilesPickerDialog";
@@ -51,6 +52,7 @@ export class PageObject {
   public settings: Settings;
   public appManagement: AppManagement;
   public promptLibrary: PromptLibrary;
+  public fileTree: FileTree;
 
   constructor(
     public electronApp: ElectronApplication,
@@ -72,6 +74,7 @@ export class PageObject {
     this.settings = new Settings(this.page, userDataDir);
     this.appManagement = new AppManagement(this.page, electronApp, userDataDir);
     this.promptLibrary = new PromptLibrary(this.page);
+    this.fileTree = new FileTree(this.page);
   }
 
   // ================================
@@ -477,5 +480,20 @@ export class PageObject {
         installed,
       });
     }, installed);
+  }
+
+  async editFile(
+    fileName: string,
+    oldString: string,
+    newString: string,
+    options?: { skipSave?: boolean },
+  ) {
+    await this.fileTree.openFile(fileName);
+    await this.codeEditor.replaceFileContent(oldString, newString);
+    if (!options?.skipSave) {
+      await this.codeEditor.saveFile();
+      // Wait for a short period to ensure changes are applied and hot reload (if applicable) has a chance to occur.
+      await this.page.waitForTimeout(1000);
+    }
   }
 }

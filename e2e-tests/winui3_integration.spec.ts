@@ -20,24 +20,35 @@ test("WinUI3 application lifecycle", async ({ po }) => {
 
     // 5. Verify the .csproj contains WinUI3 references
     const csprojContent = await po.fileTree.readFile("WinUI3TestApp.csproj");
-    expect(cspojContent).toContain("UseWinUI");
-    expect(cspojContent).toContain("Microsoft.WindowsAppSDK");
+    expect(csprojContent).toContain("UseWinUI");
+    expect(csprojContent).toContain("Microsoft.WindowsAppSDK");
 
-    // 6. Navigate to the Preview Panel and start the app
+    // 6. Edit the MainWindow.xaml to change the button content
+    await po.editFile(
+      "MainWindow.xaml",
+      'Content="Click Me"',
+      'Content="Edited Click Me"',
+    );
+
+    // 7. Navigate to the Preview Panel and start the app
     await po.navigation.goToPreviewTab();
 
     // Wait for the preview panel to be ready
     await expect(po.page.getByTestId("native-app-preview")).toBeVisible();
 
-    // 7. Launch the application
+    // 8. Launch the application
     await po.page.getByRole("button", { name: "Launch" }).click();
 
-    // 8. Verify the status changes to 'running'
+    // 9. Verify the status changes to 'running'
     await expect(po.page.getByTestId("preview-status-badge")).toContainText("running");
 
-    // 9. Stop the application
+    // 10. Verify the button content changed
+    await po.page.waitForTimeout(5000); // Give some time for hot reload to apply
+    await expect(po.page.getByRole("button", { name: "Edited Click Me" })).toBeVisible();
+
+    // 11. Stop the application
     await po.page.getByRole("button", { name: "Stop" }).click();
 
-    // 10. Verify the status changes to 'stopped' or 'idle'
+    // 12. Verify the status changes to 'stopped' or 'idle'
     await expect(po.page.getByTestId("preview-status-badge")).toContainText("stopped", { timeout: 10000 });
 });

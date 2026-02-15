@@ -20,7 +20,7 @@ test("WinForms application lifecycle", async ({ po }) => {
 
     // 5. Verify the .csproj contains WinForms references
     const csprojContent = await po.fileTree.readFile("WinFormsTestApp.csproj");
-    expect(cspojContent).toContain("UseWindowsForms");
+    expect(csprojContent).toContain("UseWindowsForms");
 
     // 6. Navigate to the Preview Panel and start the app
     await po.navigation.goToPreviewTab();
