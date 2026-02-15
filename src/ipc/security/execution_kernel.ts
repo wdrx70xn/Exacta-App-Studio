@@ -41,11 +41,11 @@ class JobRegistry {
 
   getJob(jobId: string):
     | {
-      jobId: string;
-      appId: number;
-      createdAt: Date;
-      mode: "ephemeral" | "session";
-    }
+        jobId: string;
+        appId: number;
+        createdAt: Date;
+        mode: "ephemeral" | "session";
+      }
     | undefined {
     return this.jobs.get(jobId);
   }
@@ -175,7 +175,7 @@ export class ExecutionKernel {
 
   private activeProcesses: Map<string, any> = new Map();
 
-  private constructor() { }
+  private constructor() {}
 
   static getInstance(): ExecutionKernel {
     if (!ExecutionKernel.instance) {

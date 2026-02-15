@@ -143,8 +143,7 @@ export function getDyadExecuteSqlTags(fullResponse: string): SqlQuery[] {
 export const getExactaExecuteSqlTags = getDyadExecuteSqlTags;
 
 export function getDyadCommandTags(fullResponse: string): string[] {
-  const commandRegex =
-    /<dyad-command type="([^"]+)"[^>]*><\/dyad-command>/g;
+  const commandRegex = /<dyad-command type="([^"]+)"[^>]*><\/dyad-command>/g;
   let match;
   const commands: string[] = [];
 

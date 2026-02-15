@@ -187,11 +187,12 @@ export const hasUnclosedExactaWrite = hasUnclosedDyadWrite;
 
 function escapeDyadTags(text: string): string {
   // Escape tags in reasoning content
-  return text.replace(/<dyad/g, (m) => `＜${m.slice(1)}`)
+  return text
+    .replace(/<dyad/g, (m) => `＜${m.slice(1)}`)
     .replace(/<\/dyad/g, (m) => `＜${m.slice(1)}`);
 }
 
-const escapeExactaTags = escapeDyadTags;
+
 
 // Ensure the temp directory exists
 if (!fs.existsSync(TEMP_DIR)) {
@@ -565,14 +566,14 @@ ${componentSnippet}
         // we handle this specially below.
         const chatContext =
           req.selectedComponents &&
-            req.selectedComponents.length > 0 &&
-            !isSmartContextEnabled
+          req.selectedComponents.length > 0 &&
+          !isSmartContextEnabled
             ? {
-              contextPaths: req.selectedComponents.map((component) => ({
-                globPath: component.relativePath,
-              })),
-              smartContextAutoIncludes: [],
-            }
+                contextPaths: req.selectedComponents.map((component) => ({
+                  globPath: component.relativePath,
+                })),
+                smartContextAutoIncludes: [],
+              }
             : validateChatContext(updatedChat.app.chatContext);
 
         // Extract codebase for current app
@@ -780,10 +781,10 @@ ${componentSnippet}
             (settings.selectedChatMode === "local-agent"
               ? ""
               : await getSupabaseContext({
-                supabaseProjectId: updatedChat.app.supabaseProjectId,
-                organizationSlug:
-                  updatedChat.app.supabaseOrganizationSlug ?? null,
-              }));
+                  supabaseProjectId: updatedChat.app.supabaseProjectId,
+                  organizationSlug:
+                    updatedChat.app.supabaseOrganizationSlug ?? null,
+                }));
         } else if (
           // Neon projects don't need Supabase.
           !updatedChat.app?.neonProjectId &&
@@ -863,32 +864,32 @@ This conversation includes one or more image attachments. When the user uploads 
 
         const codebasePrefix = isEngineEnabled
           ? // No codebase prefix if engine is set, we will take of it there.
-          []
+            []
           : ([
-            {
-              role: "user",
-              content: createCodebasePrompt(codebaseInfo),
-            },
-            {
-              role: "assistant",
-              content: "OK, got it. I'm ready to help",
-            },
-          ] as const);
+              {
+                role: "user",
+                content: createCodebasePrompt(codebaseInfo),
+              },
+              {
+                role: "assistant",
+                content: "OK, got it. I'm ready to help",
+              },
+            ] as const);
 
         // If engine is enabled, we will send the other apps codebase info to the engine
         // and process it with smart context.
         const otherCodebasePrefix =
           otherAppsCodebaseInfo && !isEngineEnabled
             ? ([
-              {
-                role: "user",
-                content: createOtherAppsCodebasePrompt(otherAppsCodebaseInfo),
-              },
-              {
-                role: "assistant",
-                content: "OK.",
-              },
-            ] as const)
+                {
+                  role: "user",
+                  content: createOtherAppsCodebasePrompt(otherAppsCodebaseInfo),
+                },
+                {
+                  role: "assistant",
+                  content: "OK.",
+                },
+              ] as const)
             : [];
 
         const limitedHistoryChatMessages = limitedMessageHistory.map((msg) => ({
@@ -1486,11 +1487,11 @@ ${formattedSearchReplaceIssues}`,
               ) {
                 fullResponse += `<exacta-problem-report summary="${problemReport.problems.length} problems">
 ${problemReport.problems
-                    .map(
-                      (problem) =>
-                        `<problem file="${escapeXmlAttr(problem.file)}" line="${problem.line}" column="${problem.column}" code="${problem.code}">${escapeXmlContent(problem.message)}</problem>`,
-                    )
-                    .join("\n")}
+  .map(
+    (problem) =>
+      `<problem file="${escapeXmlAttr(problem.file)}" line="${problem.line}" column="${problem.column}" code="${problem.code}">${escapeXmlContent(problem.message)}</problem>`,
+  )
+  .join("\n")}
 </exacta-problem-report>`;
 
                 logger.info(
@@ -1899,7 +1900,6 @@ export function removeProblemReportTags(text: string): string {
     /<(?:dyad|exacta)-problem-report[^>]*>[\s\S]*?<\/(?:dyad|exacta)-problem-report>/g;
   return text.replace(problemReportRegex, "").trim();
 }
-
 
 const CODEBASE_PROMPT_PREFIX = "This is my codebase.";
 function createCodebasePrompt(codebaseInfo: string): string {

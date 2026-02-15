@@ -51,8 +51,10 @@ describe("ExecutionKernel Unit Tests", () => {
 
     it("should have correct allowed commands list", () => {
       const allowedCommands = kernel.getAllowedCommands();
-      
-      expect(allowedCommands).toEqual(expect.arrayContaining(["new", "restore", "build", "run"]));
+
+      expect(allowedCommands).toEqual(
+        expect.arrayContaining(["new", "restore", "build", "run"]),
+      );
       expect(allowedCommands).toHaveLength(4);
     });
   });
@@ -65,13 +67,13 @@ describe("ExecutionKernel Unit Tests", () => {
     it("should reject disallowed command during execution", async () => {
       // Test that the command validation happens during execution
       // Since we can't actually execute commands in tests, we'll test the validation logic
-      
+
       // We'll test by creating a scenario where the command isn't in the allowed list
       const testFn = () => {
         const allowedCommands = ["custom-command"];
         return kernel.execute("dangerous-command", ["arg"], {
           cwd: "/tmp",
-          allowedCommands
+          allowedCommands,
         });
       };
 
@@ -89,7 +91,7 @@ describe("ExecutionKernel Unit Tests", () => {
       // Test that custom timeout can be passed
       const executePromise = kernel.execute("echo", ["test"], {
         cwd: "/tmp",
-        timeout: 1000 // 1 second
+        timeout: 1000, // 1 second
       });
 
       // The promise will fail because echo command doesn't exist in this context,
@@ -101,8 +103,10 @@ describe("ExecutionKernel Unit Tests", () => {
   describe("getAllowedCommands", () => {
     it("should return correct allowed commands", () => {
       const allowedCommands = kernel.getAllowedCommands();
-      
-      expect(allowedCommands).toEqual(expect.arrayContaining(["new", "restore", "build", "run"]));
+
+      expect(allowedCommands).toEqual(
+        expect.arrayContaining(["new", "restore", "build", "run"]),
+      );
       expect(allowedCommands).toHaveLength(4);
     });
   });

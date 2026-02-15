@@ -10,26 +10,28 @@ import { executionKernel } from "../../security/execution_kernel";
 describe("DotNetRuntimeProvider - Dependency Resolution Property Tests", () => {
   beforeEach(() => {
     // Mock execution kernel for controlled testing
-    vi.spyOn(executionKernel, "execute").mockImplementation(async (kernelCommand, defaultOptions) => {
-      // Simulate different outcomes based on the command
-      if (kernelCommand.args.includes("restore")) {
-        // Simulate successful restore
+    vi.spyOn(executionKernel, "execute").mockImplementation(
+      async (kernelCommand, _defaultOptions) => {
+        // Simulate different outcomes based on the command
+        if (kernelCommand.args.includes("restore")) {
+          // Simulate successful restore
+          return {
+            stdout: "Restore completed successfully.",
+            stderr: "",
+            exitCode: 0,
+            duration: 1000,
+            riskLevel: "medium" as const,
+          };
+        }
         return {
-          stdout: "Restore completed successfully.",
+          stdout: "",
           stderr: "",
           exitCode: 0,
-          duration: 1000,
-          riskLevel: "medium" as const,
+          duration: 100,
+          riskLevel: "low" as const,
         };
-      }
-      return {
-        stdout: "",
-        stderr: "",
-        exitCode: 0,
-        duration: 100,
-        riskLevel: "low" as const,
-      };
-    });
+      },
+    );
   });
 
   it("should consistently succeed when restoring valid dependencies", async () => {
@@ -72,12 +74,12 @@ describe("DotNetRuntimeProvider - Dependency Resolution Property Tests", () => {
         dotNetRuntimeProvider.resolveDependencies({
           appPath: `/test/project-${i}`,
           appId: 123 + i,
-        })
-      )
+        }),
+      ),
     );
 
     // All results should have the same basic structure
-    results.forEach(result => {
+    results.forEach((result) => {
       expect(result).toHaveProperty("stdout");
       expect(result).toHaveProperty("stderr");
       expect(result).toHaveProperty("exitCode");
@@ -94,7 +96,7 @@ describe("DotNetRuntimeProvider - Dependency Resolution Property Tests", () => {
         dotNetRuntimeProvider.resolveDependencies({
           appPath: `/test/project-${i}`,
           appId: 100 + i,
-        })
+        }),
       );
     }
 
@@ -102,7 +104,7 @@ describe("DotNetRuntimeProvider - Dependency Resolution Property Tests", () => {
 
     // Results should be independent
     expect(results.length).toBe(3);
-    results.forEach((result, index) => {
+    results.forEach((result, _index) => {
       expect(result).toBeDefined();
     });
   });

@@ -217,7 +217,7 @@ class DotNetRuntimeProviderImpl implements RuntimeProvider {
       // Instantiate template with project name
       const instantiated = templateManager.instantiateTemplate(
         template,
-        options.projectName
+        options.projectName,
       );
 
       // Create project directory
@@ -233,17 +233,29 @@ class DotNetRuntimeProviderImpl implements RuntimeProvider {
       // Determine entry point (the .csproj file)
       const entryPoint = this.getEntryPointForTemplate(
         stackType,
-        options.projectName
+        options.projectName,
       );
 
       // Initialize project state
       const framework = stackType.toUpperCase() as ProjectState["framework"];
-      const fileMap = new Map<string, { path: string; type: "xaml" | "csharp" | "resource" | "config" | "project"; lastModified: Date }>();
+      const fileMap = new Map<
+        string,
+        {
+          path: string;
+          type: "xaml" | "csharp" | "resource" | "config" | "project";
+          lastModified: Date;
+        }
+      >();
 
       for (const file of instantiated.files) {
         fileMap.set(file.path, {
           path: file.path,
-          type: file.type as "xaml" | "csharp" | "resource" | "config" | "project",
+          type: file.type as
+            | "xaml"
+            | "csharp"
+            | "resource"
+            | "config"
+            | "project",
           lastModified: new Date(),
         });
       }
@@ -283,10 +295,12 @@ class DotNetRuntimeProviderImpl implements RuntimeProvider {
       // 1. Validate based on file type
       if (fileExt === ".xaml") {
         const validation = editValidator.validateXaml(options.content);
-        if (!validation.isValid) return { success: false, error: validation.error };
+        if (!validation.isValid)
+          return { success: false, error: validation.error };
       } else if (fileExt === ".cs") {
         const validation = editValidator.validateCSharp(options.content);
-        if (!validation.isValid) return { success: false, error: validation.error };
+        if (!validation.isValid)
+          return { success: false, error: validation.error };
       }
 
       // 2. Write file
@@ -299,11 +313,19 @@ class DotNetRuntimeProviderImpl implements RuntimeProvider {
       }
 
       // 4. Sync .csproj
-      const csprojPath = path.join(options.appPath, `${options.projectName}.csproj`);
-      const fileType = fileExt === ".xaml" ? "xaml" : (fileExt === ".cs" ? "csharp" : "resource");
+      const csprojPath = path.join(
+        options.appPath,
+        `${options.projectName}.csproj`,
+      );
+      const fileType =
+        fileExt === ".xaml"
+          ? "xaml"
+          : fileExt === ".cs"
+            ? "csharp"
+            : "resource";
 
       await projectFileSystem.syncCsproj(csprojPath, [
-        { path: relativePath, type: fileType }
+        { path: relativePath, type: fileType },
       ]);
 
       // 5. Update state
@@ -323,16 +345,23 @@ class DotNetRuntimeProviderImpl implements RuntimeProvider {
     }
   }
 
-  private parseDependencyErrors(stderr: string, stdout: string): ErrorResponse[] {
+  private parseDependencyErrors(
+    stderr: string,
+    stdout: string,
+  ): ErrorResponse[] {
     const errors: ErrorResponse[] = [];
     const combinedOutput = stderr + "\n" + stdout;
     const lines = combinedOutput.split("\n");
 
     for (const line of lines) {
       // Look for common NuGet error patterns
-      const nugetErrorMatch = line.match(/(error|failed).*NU\d+.*(?:package|reference)/i);
+      const nugetErrorMatch = line.match(
+        /(error|failed).*NU\d+.*(?:package|reference)/i,
+      );
       if (nugetErrorMatch) {
-        const packageNameMatch = line.match(/(?:package|reference)\s+['"]?([^'"\s]+)['"]?/i);
+        const packageNameMatch = line.match(
+          /(?:package|reference)\s+['"]?([^'"\s]+)['"]?/i,
+        );
         const errorCodeMatch = line.match(/NU\d+/i);
 
         errors.push({
@@ -348,7 +377,9 @@ class DotNetRuntimeProviderImpl implements RuntimeProvider {
       }
 
       // Look for package not found errors
-      const packageNotFoundMatch = line.match(/(?:could not|unable to|package).*['"]?([^'"\s]+)['"]?.*(?:not found|does not exist)/i);
+      const packageNotFoundMatch = line.match(
+        /(?:could not|unable to|package).*['"]?([^'"\s]+)['"]?.*(?:not found|does not exist)/i,
+      );
       if (packageNotFoundMatch) {
         errors.push({
           category: "dependency",
@@ -363,7 +394,9 @@ class DotNetRuntimeProviderImpl implements RuntimeProvider {
       }
 
       // Look for network-related errors
-      const networkErrorMatch = line.match(/(?:network|connection|http|ssl|certificate|proxy|firewall)/i);
+      const networkErrorMatch = line.match(
+        /(?:network|connection|http|ssl|certificate|proxy|firewall)/i,
+      );
       if (networkErrorMatch) {
         errors.push({
           category: "dependency",
@@ -376,7 +409,9 @@ class DotNetRuntimeProviderImpl implements RuntimeProvider {
       }
 
       // Look for access denied errors
-      const accessDeniedMatch = line.match(/(?:access is denied|forbidden|authorization|permission denied)/i);
+      const accessDeniedMatch = line.match(
+        /(?:access is denied|forbidden|authorization|permission denied)/i,
+      );
       if (accessDeniedMatch) {
         errors.push({
           category: "dependency",
@@ -410,12 +445,15 @@ class DotNetRuntimeProviderImpl implements RuntimeProvider {
     );
 
     // Parse dependency errors from the output
-    const dependencyErrors = this.parseDependencyErrors(result.stderr, result.stdout);
+    const dependencyErrors = this.parseDependencyErrors(
+      result.stderr,
+      result.stdout,
+    );
 
     // Log dependency errors for debugging
     if (dependencyErrors.length > 0) {
       console.log(`Dependency errors detected: ${dependencyErrors.length}`);
-      dependencyErrors.forEach(error => {
+      dependencyErrors.forEach((error) => {
         console.log(`  - ${error.code}: ${error.message}`);
       });
     }

@@ -1,9 +1,9 @@
 /**
  * Unit tests for DotNetRuntimeProvider scaffold functionality
- * 
+ *
  * Feature: windows-native-app-builder
  * Tests project scaffolding for WPF, WinUI3, and WinForms
- * 
+ *
  * Requirements tested:
  * - 1.1: Create complete project structure
  * - 1.2: Use appropriate templates for framework type
@@ -84,10 +84,12 @@ describe("DotNetRuntimeProvider - Scaffold", () => {
       const csprojContent = await fs.readFile(csprojPath, "utf-8");
 
       // Verify it's valid XML
-      expect(csprojContent).toContain("<Project Sdk=\"Microsoft.NET.Sdk\">");
+      expect(csprojContent).toContain('<Project Sdk="Microsoft.NET.Sdk">');
       expect(csprojContent).toContain("<OutputType>WinExe</OutputType>");
       expect(csprojContent).toContain("<UseWPF>true</UseWPF>");
-      expect(csprojContent).toContain("<TargetFramework>net8.0-windows</TargetFramework>");
+      expect(csprojContent).toContain(
+        "<TargetFramework>net8.0-windows</TargetFramework>",
+      );
     });
 
     it("should create valid WPF App.xaml with correct namespace", async () => {
@@ -104,7 +106,7 @@ describe("DotNetRuntimeProvider - Scaffold", () => {
       const appXamlContent = await fs.readFile(appXamlPath, "utf-8");
 
       expect(appXamlContent).toContain('x:Class="MyWpfApp.App"');
-      expect(appXamlContent).toContain("StartupUri=\"MainWindow.xaml\"");
+      expect(appXamlContent).toContain('StartupUri="MainWindow.xaml"');
     });
 
     it("should create valid WPF code-behind files", async () => {
@@ -127,7 +129,9 @@ describe("DotNetRuntimeProvider - Scaffold", () => {
       const mainWindowCsContent = await fs.readFile(mainWindowCsPath, "utf-8");
 
       expect(mainWindowCsContent).toContain("namespace MyWpfApp");
-      expect(mainWindowCsContent).toContain("public partial class MainWindow : Window");
+      expect(mainWindowCsContent).toContain(
+        "public partial class MainWindow : Window",
+      );
     });
   });
 
@@ -146,12 +150,24 @@ describe("DotNetRuntimeProvider - Scaffold", () => {
       expect(result.entryPoint).toBe(`${projectName}.csproj`);
 
       // Verify all required files exist
-      expect(await fs.pathExists(path.join(fullAppPath, `${projectName}.csproj`))).toBe(true);
-      expect(await fs.pathExists(path.join(fullAppPath, "App.xaml"))).toBe(true);
-      expect(await fs.pathExists(path.join(fullAppPath, "App.xaml.cs"))).toBe(true);
-      expect(await fs.pathExists(path.join(fullAppPath, "MainWindow.xaml"))).toBe(true);
-      expect(await fs.pathExists(path.join(fullAppPath, "MainWindow.xaml.cs"))).toBe(true);
-      expect(await fs.pathExists(path.join(fullAppPath, "app.manifest"))).toBe(true);
+      expect(
+        await fs.pathExists(path.join(fullAppPath, `${projectName}.csproj`)),
+      ).toBe(true);
+      expect(await fs.pathExists(path.join(fullAppPath, "App.xaml"))).toBe(
+        true,
+      );
+      expect(await fs.pathExists(path.join(fullAppPath, "App.xaml.cs"))).toBe(
+        true,
+      );
+      expect(
+        await fs.pathExists(path.join(fullAppPath, "MainWindow.xaml")),
+      ).toBe(true);
+      expect(
+        await fs.pathExists(path.join(fullAppPath, "MainWindow.xaml.cs")),
+      ).toBe(true);
+      expect(await fs.pathExists(path.join(fullAppPath, "app.manifest"))).toBe(
+        true,
+      );
     });
 
     it("should create WinUI3 .csproj with WindowsAppSDK references", async () => {
@@ -185,7 +201,7 @@ describe("DotNetRuntimeProvider - Scaffold", () => {
       const manifestPath = path.join(fullAppPath, "app.manifest");
       const manifestContent = await fs.readFile(manifestPath, "utf-8");
 
-      expect(manifestContent).toContain("<assembly manifestVersion=\"1.0\"");
+      expect(manifestContent).toContain('<assembly manifestVersion="1.0"');
       expect(manifestContent).toContain("dpiAwareness");
     });
   });
@@ -205,9 +221,15 @@ describe("DotNetRuntimeProvider - Scaffold", () => {
       expect(result.entryPoint).toBe(`${projectName}.csproj`);
 
       // Verify all required files exist
-      expect(await fs.pathExists(path.join(fullAppPath, `${projectName}.csproj`))).toBe(true);
-      expect(await fs.pathExists(path.join(fullAppPath, "Program.cs"))).toBe(true);
-      expect(await fs.pathExists(path.join(fullAppPath, "Form1.cs"))).toBe(true);
+      expect(
+        await fs.pathExists(path.join(fullAppPath, `${projectName}.csproj`)),
+      ).toBe(true);
+      expect(await fs.pathExists(path.join(fullAppPath, "Program.cs"))).toBe(
+        true,
+      );
+      expect(await fs.pathExists(path.join(fullAppPath, "Form1.cs"))).toBe(
+        true,
+      );
     });
 
     it("should create valid WinForms Program.cs with entry point", async () => {
@@ -241,7 +263,9 @@ describe("DotNetRuntimeProvider - Scaffold", () => {
       const csprojPath = path.join(fullAppPath, `${projectName}.csproj`);
       const csprojContent = await fs.readFile(csprojPath, "utf-8");
 
-      expect(csprojContent).toContain("<UseWindowsForms>true</UseWindowsForms>");
+      expect(csprojContent).toContain(
+        "<UseWindowsForms>true</UseWindowsForms>",
+      );
       expect(csprojContent).toContain("<OutputType>WinExe</OutputType>");
     });
   });
@@ -259,8 +283,12 @@ describe("DotNetRuntimeProvider - Scaffold", () => {
 
       expect(result.success).toBe(true);
 
-      expect(await fs.pathExists(path.join(fullAppPath, `${projectName}.csproj`))).toBe(true);
-      expect(await fs.pathExists(path.join(fullAppPath, "Program.cs"))).toBe(true);
+      expect(
+        await fs.pathExists(path.join(fullAppPath, `${projectName}.csproj`)),
+      ).toBe(true);
+      expect(await fs.pathExists(path.join(fullAppPath, "Program.cs"))).toBe(
+        true,
+      );
     });
 
     it("should create Console .csproj with Exe output type", async () => {
@@ -278,7 +306,9 @@ describe("DotNetRuntimeProvider - Scaffold", () => {
 
       expect(csprojContent).toContain("<OutputType>Exe</OutputType>");
       expect(csprojContent).not.toContain("<UseWPF>true</UseWPF>");
-      expect(csprojContent).not.toContain("<UseWindowsForms>true</UseWindowsForms>");
+      expect(csprojContent).not.toContain(
+        "<UseWindowsForms>true</UseWindowsForms>",
+      );
     });
   });
 
@@ -309,7 +339,7 @@ describe("DotNetRuntimeProvider - Scaffold", () => {
       });
 
       expect(result.success).toBe(true);
-      
+
       // Verify files were created
       expect(await fs.pathExists(fullAppPath)).toBe(true);
     });
@@ -327,8 +357,12 @@ describe("DotNetRuntimeProvider - Scaffold", () => {
       expect(result.success).toBe(true);
 
       // Verify it's a WPF project (has XAML files)
-      expect(await fs.pathExists(path.join(fullAppPath, "App.xaml"))).toBe(true);
-      expect(await fs.pathExists(path.join(fullAppPath, "MainWindow.xaml"))).toBe(true);
+      expect(await fs.pathExists(path.join(fullAppPath, "App.xaml"))).toBe(
+        true,
+      );
+      expect(
+        await fs.pathExists(path.join(fullAppPath, "MainWindow.xaml")),
+      ).toBe(true);
     });
   });
 
@@ -351,7 +385,7 @@ describe("DotNetRuntimeProvider - Scaffold", () => {
         for (const file of files) {
           const filePath = path.join(fullAppPath, file as string);
           const stat = await fs.stat(filePath);
-          
+
           if (stat.isFile()) {
             const content = await fs.readFile(filePath, "utf-8");
             expect(content).not.toContain("{{ProjectName}}");
@@ -373,14 +407,16 @@ describe("DotNetRuntimeProvider - Scaffold", () => {
       });
 
       const xamlFiles = ["App.xaml", "MainWindow.xaml"];
-      
+
       for (const xamlFile of xamlFiles) {
         const xamlPath = path.join(fullAppPath, xamlFile);
         const content = await fs.readFile(xamlPath, "utf-8");
 
         // Basic XML validation
         expect(content.trim().startsWith("<")).toBe(true);
-        expect(content).toContain("xmlns=\"http://schemas.microsoft.com/winfx/2006/xaml/presentation\"");
+        expect(content).toContain(
+          'xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"',
+        );
       }
     });
 

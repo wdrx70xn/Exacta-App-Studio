@@ -17,7 +17,8 @@ describe("DotNetRuntimeProvider - Dependency Error Unit Tests", () => {
     // Mock execution to return NuGet error
     vi.spyOn(executionKernel, "execute").mockResolvedValue({
       stdout: "",
-      stderr: "error NU1101: Unable to find package NonExistent.Package. No packages exist with this id in source(s).",
+      stderr:
+        "error NU1101: Unable to find package NonExistent.Package. No packages exist with this id in source(s).",
       exitCode: 1,
       duration: 1000,
       riskLevel: "medium" as const,
@@ -37,7 +38,8 @@ describe("DotNetRuntimeProvider - Dependency Error Unit Tests", () => {
     // Mock execution to return network error
     vi.spyOn(executionKernel, "execute").mockResolvedValue({
       stdout: "",
-      stderr: "error: The SSL connection could not be established, see inner exception. Network connectivity issue.",
+      stderr:
+        "error: The SSL connection could not be established, see inner exception. Network connectivity issue.",
       exitCode: 1,
       duration: 1000,
       riskLevel: "medium" as const,
@@ -56,7 +58,8 @@ describe("DotNetRuntimeProvider - Dependency Error Unit Tests", () => {
     // Mock execution to return package not found error
     vi.spyOn(executionKernel, "execute").mockResolvedValue({
       stdout: "",
-      stderr: "error: Could not find package MyTestPackage. The package does not exist in the source.",
+      stderr:
+        "error: Could not find package MyTestPackage. The package does not exist in the source.",
       exitCode: 1,
       duration: 1000,
       riskLevel: "medium" as const,
@@ -75,7 +78,8 @@ describe("DotNetRuntimeProvider - Dependency Error Unit Tests", () => {
     // Mock execution to return both success and error messages
     vi.spyOn(executionKernel, "execute").mockResolvedValue({
       stdout: "Restoring packages for .NET Framework v4.7.2...",
-      stderr: "error NU1202: Package Some.Package 1.0.0 is not compatible with net6.0.",
+      stderr:
+        "error NU1202: Package Some.Package 1.0.0 is not compatible with net6.0.",
       exitCode: 0, // Note: exit code is 0 but there are errors in stderr
       duration: 1000,
       riskLevel: "medium" as const,
@@ -97,7 +101,8 @@ describe("DotNetRuntimeProvider - Dependency Error Unit Tests", () => {
     // Mock execution to return access denied error
     vi.spyOn(executionKernel, "execute").mockResolvedValue({
       stdout: "",
-      stderr: "error: Access is denied. Failed to download package from source.",
+      stderr:
+        "error: Access is denied. Failed to download package from source.",
       exitCode: 1,
       duration: 1000,
       riskLevel: "medium" as const,
@@ -141,11 +146,13 @@ warning NU1603: PackageC depends on PackageD which is not available.`,
         expectedPackage: "Newtonsoft.Json",
       },
       {
-        stderr: "error: Could not install package Microsoft.EntityFrameworkCore.",
+        stderr:
+          "error: Could not install package Microsoft.EntityFrameworkCore.",
         expectedPackage: "Microsoft.EntityFrameworkCore",
       },
       {
-        stderr: "Package restore failed. Unable to locate package Serilog.Extensions.Logging.",
+        stderr:
+          "Package restore failed. Unable to locate package Serilog.Extensions.Logging.",
         expectedPackage: "Serilog.Extensions.Logging",
       },
     ];

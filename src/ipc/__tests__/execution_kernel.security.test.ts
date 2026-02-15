@@ -1,10 +1,10 @@
 /**
  * Security tests for ExecutionKernel
- * 
+ *
  * Feature: windows-native-app-builder
  * Property 11: Security Command Validation
  * Validates: Requirements 4.4, 12.4
- * 
+ *
  * Tests:
  * - Command validation (allowed vs disallowed)
  * - Working directory restriction
@@ -35,8 +35,8 @@ describe("ExecutionKernel Security", () => {
           executionKernel.execute(
             { command, args },
             { appId: 123, cwd: process.cwd() },
-            "dotnet"
-          )
+            "dotnet",
+          ),
         ).rejects.toThrow(`Command not allowed: ${command}`);
       }
     });
@@ -65,8 +65,8 @@ describe("ExecutionKernel Security", () => {
         executionKernel.execute(
           { command: "unknown-command", args: [] },
           { appId: 123, cwd: process.cwd() },
-          "dotnet"
-        )
+          "dotnet",
+        ),
       ).rejects.toThrow("Command not allowed: unknown-command");
     });
   });
@@ -90,19 +90,17 @@ describe("ExecutionKernel Security", () => {
       // This test verifies the validation logic exists
       // We can't actually execute without .NET, but we can verify the path check
       const kernel: any = ExecutionKernel.getInstance();
-      
+
       // Mock fs methods to simulate valid path
       const originalExistsSync = fs.existsSync;
       const originalRealpath = fs.promises.realpath;
-      
+
       try {
         fs.existsSync = vi.fn(() => true) as any;
         fs.promises.realpath = vi.fn((p: string) => Promise.resolve(p)) as any;
-        
+
         // Should not throw for valid paths
-        await expect(
-          kernel.validatePath(appDir, 123)
-        ).resolves.not.toThrow();
+        await expect(kernel.validatePath(appDir, 123)).resolves.not.toThrow();
       } finally {
         fs.existsSync = originalExistsSync;
         fs.promises.realpath = originalRealpath;
@@ -111,28 +109,28 @@ describe("ExecutionKernel Security", () => {
 
     it("should reject execution outside allowed directories", async () => {
       const kernel: any = ExecutionKernel.getInstance();
-      
+
       // Mock fs methods to simulate invalid path
       const originalRealpath = fs.promises.realpath;
-      
+
       try {
         fs.promises.realpath = vi.fn((p: string) => Promise.resolve(p));
-        
+
         // Should throw for paths outside allowed directories
-        await expect(
-          kernel.validatePath("/etc/passwd", 123)
-        ).rejects.toThrow("Security violation");
+        await expect(kernel.validatePath("/etc/passwd", 123)).rejects.toThrow(
+          "Security violation",
+        );
       } finally {
         fs.promises.realpath = originalRealpath;
       }
     });
 
     it("should detect path traversal attempts", async () => {
-      const kernel: any = ExecutionKernel.getInstance();
       
+
       // Path containing .. should be rejected
       const maliciousPath = "/safe/path/../../../etc/passwd";
-      
+
       expect(maliciousPath).toContain("..");
     });
   });
@@ -140,18 +138,18 @@ describe("ExecutionKernel Security", () => {
   describe("Executable Validation", () => {
     it("should validate executables against trusted paths", async () => {
       const kernel: any = ExecutionKernel.getInstance();
-      
+
       // Check that dotnet has trusted paths configured
       expect(kernel.TRUSTED_PATHS.dotnet).toBeDefined();
       expect(Array.isArray(kernel.TRUSTED_PATHS.dotnet)).toBe(true);
     });
 
     it("should allow node_modules binaries for development", async () => {
-      const kernel: any = ExecutionKernel.getInstance();
       
+
       // Mock the path resolution
       const mockPath = "/project/node_modules/.bin/some-cmd";
-      
+
       // Should be considered trusted if in node_modules/.bin
       expect(mockPath).toContain("node_modules");
       expect(mockPath).toContain(".bin");
@@ -248,7 +246,7 @@ describe("ExecutionKernel Security", () => {
       const customTimeout = 120000; // 2 minutes
       const options = applyLimits(
         { appId: 123, cwd: "/test", timeout: customTimeout },
-        "medium"
+        "medium",
       );
 
       expect(options.timeout).toBeLessThanOrEqual(300000);
@@ -259,16 +257,16 @@ describe("ExecutionKernel Security", () => {
       const applyLimits = kernel.applyRiskBasedLimits.bind(kernel);
 
       const excessiveTimeout = 999999999;
-      
+
       const highRiskOptions = applyLimits(
         { appId: 123, cwd: "/test", timeout: excessiveTimeout },
-        "high"
+        "high",
       );
       expect(highRiskOptions.timeout).toBe(30000);
 
       const mediumRiskOptions = applyLimits(
         { appId: 123, cwd: "/test", timeout: excessiveTimeout },
-        "medium"
+        "medium",
       );
       expect(mediumRiskOptions.timeout).toBe(300000);
     });
@@ -283,7 +281,7 @@ describe("ExecutionKernel Security", () => {
     it("should be able to terminate jobs by ID", async () => {
       // Create a mock job ID
       const jobId = `test_job_${Date.now()}`;
-      
+
       // Terminating a non-existent job should return false
       const result = await executionKernel.terminateJob(jobId);
       expect(result).toBe(false);
@@ -325,7 +323,7 @@ describe("ExecutionKernel Security", () => {
           appId: 123,
           cwd: tempDir,
           workspaceSizeLimitMB: 1000,
-        })
+        }),
       ).resolves.not.toThrow();
     });
   });

@@ -68,10 +68,10 @@ The design follows Dyad's existing RuntimeProvider pattern, implementing a compl
 ### Workflow Sequence
 
 ```
-User Prompt → AI Agent → scaffold() → write files → resolveDependencies() 
+User Prompt → AI Agent → scaffold() → write files → resolveDependencies()
 → build() → run() → Display in Native Window
 
-User Edit Request → AI Agent → edit files → build() → run() 
+User Edit Request → AI Agent → edit files → build() → run()
 → Display Updated App
 ```
 
@@ -95,8 +95,11 @@ class DotNetRuntimeProvider implements RuntimeProvider {
   private executionKernel: ExecutionKernel;
   private templateManager: TemplateManager;
   private projectState: ProjectState;
-  
-  async scaffold(projectType: string, projectName: string): Promise<ScaffoldResult> {
+
+  async scaffold(
+    projectType: string,
+    projectName: string,
+  ): Promise<ScaffoldResult> {
     // 1. Determine framework (WPF, WinUI3, WinForms) from projectType
     // 2. Load appropriate template
     // 3. Create project directory structure
@@ -104,21 +107,21 @@ class DotNetRuntimeProvider implements RuntimeProvider {
     // 5. Create initial XAML and C# files
     // 6. Return project path and file list
   }
-  
+
   async resolveDependencies(projectPath: string): Promise<DependencyResult> {
     // 1. Execute 'dotnet restore' via ExecutionKernel
     // 2. Parse output for errors
     // 3. Verify packages.lock.json or obj/ folder created
     // 4. Return success/failure with error details
   }
-  
+
   async build(projectPath: string): Promise<BuildResult> {
     // 1. Execute 'dotnet build' via ExecutionKernel
     // 2. Parse compiler output for errors/warnings
     // 3. Locate output executable in bin/ directory
     // 4. Return build status and executable path
   }
-  
+
   async run(projectPath: string, executablePath: string): Promise<RunResult> {
     // 1. Start process for executable
     // 2. Monitor process for crashes
@@ -134,7 +137,7 @@ class DotNetRuntimeProvider implements RuntimeProvider {
 interface ProjectState {
   projectPath: string;
   projectName: string;
-  framework: 'WPF' | 'WinUI3' | 'WinForms';
+  framework: "WPF" | "WinUI3" | "WinForms";
   targetFramework: string; // e.g., 'net8.0-windows'
   executablePath?: string;
   processHandle?: ProcessHandle;
@@ -150,7 +153,7 @@ Manages framework-specific templates for project scaffolding.
 
 ```typescript
 interface Template {
-  framework: 'WPF' | 'WinUI3' | 'WinForms';
+  framework: "WPF" | "WinUI3" | "WinForms";
   files: TemplateFile[];
   packageReferences: PackageReference[];
   targetFramework: string;
@@ -159,17 +162,20 @@ interface Template {
 interface TemplateFile {
   path: string; // Relative path in project
   content: string; // Template content with placeholders
-  type: 'xaml' | 'csharp' | 'project' | 'config';
+  type: "xaml" | "csharp" | "project" | "config";
 }
 
 class TemplateManager {
   private templates: Map<string, Template>;
-  
+
   getTemplate(framework: string): Template {
     // Return appropriate template for framework
   }
-  
-  instantiateTemplate(template: Template, projectName: string): InstantiatedTemplate {
+
+  instantiateTemplate(
+    template: Template,
+    projectName: string,
+  ): InstantiatedTemplate {
     // Replace placeholders ({{ProjectName}}, {{Namespace}})
     // Return ready-to-write files
   }
@@ -179,18 +185,21 @@ class TemplateManager {
 **Template Examples:**
 
 WPF Template includes:
+
 - `App.xaml` and `App.xaml.cs`
 - `MainWindow.xaml` and `MainWindow.xaml.cs`
 - `ProjectName.csproj` with WPF SDK reference
 - `AssemblyInfo.cs` (if needed)
 
 WinUI3 Template includes:
+
 - `App.xaml` and `App.xaml.cs`
 - `MainWindow.xaml` and `MainWindow.xaml.cs`
 - `ProjectName.csproj` with WinUI3 SDK reference
 - `app.manifest` for Windows 10/11 compatibility
 
 WinForms Template includes:
+
 - `Program.cs` with application entry point
 - `Form1.cs` and `Form1.Designer.cs`
 - `ProjectName.csproj` with WinForms SDK reference
@@ -335,7 +344,7 @@ class ExecutionKernel {
   async executeCommand(
     command: string,
     args: string[],
-    constraints: ExecutionConstraints
+    constraints: ExecutionConstraints,
   ): Promise<ExecutionResult> {
     // 1. Validate command is in allowedCommands
     // 2. Validate working directory is within allowed path
@@ -376,6 +385,7 @@ interface ProcessOutput {
 **Window Display:**
 
 The application runs in a separate native Windows process, not embedded in Dyad. The preview UI shows:
+
 - Process status (running/stopped)
 - Console output (if any)
 - Error messages
@@ -388,9 +398,9 @@ The application runs in a separate native Windows process, not embedded in Dyad.
 ```typescript
 interface ProjectConfiguration {
   name: string;
-  framework: 'WPF' | 'WinUI3' | 'WinForms';
+  framework: "WPF" | "WinUI3" | "WinForms";
   targetFramework: string; // 'net8.0-windows', 'net7.0-windows'
-  outputType: 'WinExe' | 'Exe';
+  outputType: "WinExe" | "Exe";
   useWPF?: boolean; // For .csproj
   useWindowsForms?: boolean; // For .csproj
   useWinUI?: boolean; // For .csproj
@@ -405,7 +415,7 @@ interface PackageReference {
 
 interface ProjectFile {
   path: string;
-  type: 'xaml' | 'csharp' | 'resource' | 'config';
+  type: "xaml" | "csharp" | "resource" | "config";
   dependentUpon?: string; // For code-behind files
 }
 ```
@@ -427,7 +437,7 @@ interface CompilerError {
   file: string;
   line: number;
   column: number;
-  severity: 'error' | 'warning';
+  severity: "error" | "warning";
 }
 ```
 
@@ -435,16 +445,16 @@ interface CompilerError {
 
 ```typescript
 interface TemplateData {
-  framework: 'WPF' | 'WinUI3' | 'WinForms';
+  framework: "WPF" | "WinUI3" | "WinForms";
   files: {
-    'App.xaml'?: string;
-    'App.xaml.cs'?: string;
-    'MainWindow.xaml'?: string;
-    'MainWindow.xaml.cs'?: string;
-    'Form1.cs'?: string;
-    'Form1.Designer.cs'?: string;
-    'Program.cs'?: string;
-    'project.csproj': string;
+    "App.xaml"?: string;
+    "App.xaml.cs"?: string;
+    "MainWindow.xaml"?: string;
+    "MainWindow.xaml.cs"?: string;
+    "Form1.cs"?: string;
+    "Form1.Designer.cs"?: string;
+    "Program.cs"?: string;
+    "project.csproj": string;
   };
   replacements: {
     projectName: string;
@@ -456,132 +466,131 @@ interface TemplateData {
 
 ## Correctness Properties
 
-*A property is a characteristic or behavior that should hold true across all valid executions of a system—essentially, a formal statement about what the system should do. Properties serve as the bridge between human-readable specifications and machine-verifiable correctness guarantees.*
-
+_A property is a characteristic or behavior that should hold true across all valid executions of a system—essentially, a formal statement about what the system should do. Properties serve as the bridge between human-readable specifications and machine-verifiable correctness guarantees._
 
 ### Property 1: Scaffold Creates Complete Valid Projects
 
-*For any* supported framework type (WPF, WinUI3, WinForms) and any valid project name, scaffolding should create a complete project structure containing a valid .csproj file, all required XAML files with corresponding C# code-behind files, and all necessary configuration files for that framework.
+_For any_ supported framework type (WPF, WinUI3, WinForms) and any valid project name, scaffolding should create a complete project structure containing a valid .csproj file, all required XAML files with corresponding C# code-behind files, and all necessary configuration files for that framework.
 
 **Validates: Requirements 1.1, 1.3, 1.5, 7.4**
 
 ### Property 2: Framework-Specific Templates
 
-*For any* framework type, the scaffolded project should include framework-specific package references, appropriate using statements, and framework-specific file structures (e.g., WinUI3 projects include app.manifest, WPF projects include App.xaml).
+_For any_ framework type, the scaffolded project should include framework-specific package references, appropriate using statements, and framework-specific file structures (e.g., WinUI3 projects include app.manifest, WPF projects include App.xaml).
 
 **Validates: Requirements 1.2, 3.4, 9.5**
 
 ### Property 3: Template Placeholder Replacement
 
-*For any* template and any valid project name and namespace, instantiating the template should replace all placeholders ({{ProjectName}}, {{Namespace}}) with the provided values, and the resulting files should contain no unreplaced placeholders.
+_For any_ template and any valid project name and namespace, instantiating the template should replace all placeholders ({{ProjectName}}, {{Namespace}}) with the provided values, and the resulting files should contain no unreplaced placeholders.
 
 **Validates: Requirements 9.4**
 
 ### Property 4: XAML Validity
 
-*For any* generated XAML file, the content should be valid XML with proper XAML namespace declarations, and all event handlers referenced in the XAML should exist in the corresponding code-behind file.
+_For any_ generated XAML file, the content should be valid XML with proper XAML namespace declarations, and all event handlers referenced in the XAML should exist in the corresponding code-behind file.
 
 **Validates: Requirements 2.1, 2.3**
 
 ### Property 5: Event Handler Signatures
 
-*For any* generated event handler method in C# code-behind, the method signature should match the expected pattern (void MethodName(object sender, EventArgs e) or framework-specific variants).
+_For any_ generated event handler method in C# code-behind, the method signature should match the expected pattern (void MethodName(object sender, EventArgs e) or framework-specific variants).
 
 **Validates: Requirements 2.5**
 
 ### Property 6: Dependency Resolution Success Validation
 
-*For any* project with valid package references, calling resolveDependencies() should execute dotnet restore, and should return success only when all packages are successfully restored.
+_For any_ project with valid package references, calling resolveDependencies() should execute dotnet restore, and should return success only when all packages are successfully restored.
 
 **Validates: Requirements 3.1, 3.3**
 
 ### Property 7: Descriptive Error Messages
 
-*For any* operation that fails (scaffold, restore, build, run), the returned error should contain a descriptive message indicating the failure reason, and for build errors specifically, should include file path, line number, and column number.
+_For any_ operation that fails (scaffold, restore, build, run), the returned error should contain a descriptive message indicating the failure reason, and for build errors specifically, should include file path, line number, and column number.
 
 **Validates: Requirements 3.2, 8.1, 8.2, 8.4**
 
 ### Property 8: Error Type Categorization
 
-*For any* error from different lifecycle phases, the error object should have a type field that distinguishes between scaffold errors, dependency errors, build errors, and runtime errors.
+_For any_ error from different lifecycle phases, the error object should have a type field that distinguishes between scaffold errors, dependency errors, build errors, and runtime errors.
 
 **Validates: Requirements 8.5**
 
 ### Property 9: Build Execution and Validation
 
-*For any* project with resolved dependencies and valid code, calling build() should execute dotnet build, and on success should return an executable path that points to an existing file in the bin/ directory.
+_For any_ project with resolved dependencies and valid code, calling build() should execute dotnet build, and on success should return an executable path that points to an existing file in the bin/ directory.
 
 **Validates: Requirements 4.1, 4.3**
 
 ### Property 10: Build Error Parsing
 
-*For any* project with syntax errors, calling build() should return failure with compiler errors that include error code, message, file path, line number, and column number.
+_For any_ project with syntax errors, calling build() should return failure with compiler errors that include error code, message, file path, line number, and column number.
 
 **Validates: Requirements 4.2**
 
 ### Property 11: Security Command Validation
 
-*For any* command passed to ExecutionKernel, if the command is not in the allowed list (new, restore, build, run), the execution should be rejected with a security error.
+_For any_ command passed to ExecutionKernel, if the command is not in the allowed list (new, restore, build, run), the execution should be rejected with a security error.
 
 **Validates: Requirements 4.4, 12.4**
 
 ### Property 12: Process Lifecycle Round-Trip
 
-*For any* successfully built application, calling run() should start a new process that can be verified as running, and calling stop() on that process should terminate it such that it no longer appears in the process list.
+_For any_ successfully built application, calling run() should start a new process that can be verified as running, and calling stop() on that process should terminate it such that it no longer appears in the process list.
 
 **Validates: Requirements 5.1, 5.3, 5.5**
 
 ### Property 13: Console Output Capture
 
-*For any* application that writes to stdout or stderr, the ProcessManager should capture that output and make it available through getProcessOutput().
+_For any_ application that writes to stdout or stderr, the ProcessManager should capture that output and make it available through getProcessOutput().
 
 **Validates: Requirements 5.4, 8.3**
 
 ### Property 14: XAML Structure Preservation
 
-*For any* valid XAML file and any edit operation, if the edit maintains valid XAML syntax, the resulting file should still be valid XML with proper XAML namespace declarations.
+_For any_ valid XAML file and any edit operation, if the edit maintains valid XAML syntax, the resulting file should still be valid XML with proper XAML namespace declarations.
 
 **Validates: Requirements 6.2**
 
 ### Property 15: Surgical Code Edits
 
-*For any* C# file and any edit operation targeting a specific method, code outside the targeted method should remain byte-for-byte identical after the edit.
+_For any_ C# file and any edit operation targeting a specific method, code outside the targeted method should remain byte-for-byte identical after the edit.
 
 **Validates: Requirements 6.3**
 
 ### Property 16: Edit-Rebuild-Run Workflow
 
-*For any* project that is currently running, making a file edit should trigger a rebuild, and if the rebuild succeeds, should restart the application with the new changes.
+_For any_ project that is currently running, making a file edit should trigger a rebuild, and if the rebuild succeeds, should restart the application with the new changes.
 
 **Validates: Requirements 6.4, 6.5**
 
 ### Property 17: File Extension Correctness
 
-*For any* file created by the system, the file extension should match the file type: .xaml for XAML files, .cs for C# files, .csproj for project files.
+_For any_ file created by the system, the file extension should match the file type: .xaml for XAML files, .cs for C# files, .csproj for project files.
 
 **Validates: Requirements 7.1**
 
 ### Property 18: Project File Synchronization
 
-*For any* new XAML or C# file added to the project, if the file type requires explicit inclusion in the .csproj (framework-dependent), the .csproj should be updated to include the new file.
+_For any_ new XAML or C# file added to the project, if the file type requires explicit inclusion in the .csproj (framework-dependent), the .csproj should be updated to include the new file.
 
 **Validates: Requirements 7.2**
 
 ### Property 19: Project Organization Consistency
 
-*For any* scaffolded project, the directory structure should follow .NET conventions, and all C# file namespaces should match the project name (or project name + subdirectory path).
+_For any_ scaffolded project, the directory structure should follow .NET conventions, and all C# file namespaces should match the project name (or project name + subdirectory path).
 
 **Validates: Requirements 7.3, 7.5**
 
 ### Property 20: RuntimeProvider State Persistence
 
-*For any* sequence of lifecycle method calls (scaffold → resolveDependencies → build → run), each method should have access to the state from previous methods (e.g., build() should know the project path from scaffold()).
+_For any_ sequence of lifecycle method calls (scaffold → resolveDependencies → build → run), each method should have access to the state from previous methods (e.g., build() should know the project path from scaffold()).
 
 **Validates: Requirements 11.6**
 
 ### Property 21: Tool Operation Feedback
 
-*For any* tool operation (write_file, edit_file, run_dotnet_command), the tool should return a result object indicating success or failure with relevant details.
+_For any_ tool operation (write_file, edit_file, run_dotnet_command), the tool should return a result object indicating success or failure with relevant details.
 
 **Validates: Requirements 12.5**
 
@@ -621,7 +630,7 @@ All errors follow a consistent structure:
 
 ```typescript
 interface ErrorResponse {
-  category: 'scaffold' | 'dependency' | 'build' | 'runtime';
+  category: "scaffold" | "dependency" | "build" | "runtime";
   code: string; // e.g., 'SCAFFOLD_001', 'CS0103'
   message: string; // Human-readable description
   details: ErrorDetails;
@@ -660,6 +669,7 @@ Errors are translated into actionable messages for users:
 This feature requires both unit testing and property-based testing for comprehensive coverage:
 
 **Unit Tests** focus on:
+
 - Specific examples of each framework (WPF, WinUI3, WinForms)
 - Edge cases (empty project names, special characters)
 - Error conditions (invalid commands, missing files)
@@ -667,6 +677,7 @@ This feature requires both unit testing and property-based testing for comprehen
 - Template content verification
 
 **Property-Based Tests** focus on:
+
 - Universal properties that hold for all inputs
 - Comprehensive input coverage through randomization
 - Invariants that must be maintained across operations
@@ -677,6 +688,7 @@ This feature requires both unit testing and property-based testing for comprehen
 **Framework**: Use fast-check for TypeScript/JavaScript property-based testing
 
 **Configuration**:
+
 - Minimum 100 iterations per property test
 - Each test tagged with: **Feature: windows-native-app-builder, Property {N}: {property_text}**
 - Custom generators for:
@@ -688,29 +700,32 @@ This feature requires both unit testing and property-based testing for comprehen
 **Example Property Test Structure**:
 
 ```typescript
-import fc from 'fast-check';
+import fc from "fast-check";
 
 // Feature: windows-native-app-builder, Property 1: Scaffold Creates Complete Valid Projects
-test('scaffold creates complete valid projects', async () => {
+test("scaffold creates complete valid projects", async () => {
   await fc.assert(
     fc.asyncProperty(
-      fc.constantFrom('WPF', 'WinUI3', 'WinForms'),
+      fc.constantFrom("WPF", "WinUI3", "WinForms"),
       fc.string({ minLength: 1, maxLength: 50 }).filter(isValidProjectName),
       async (framework, projectName) => {
         const provider = new DotNetRuntimeProvider();
         const result = await provider.scaffold(framework, projectName);
-        
+
         expect(result.success).toBe(true);
         expect(result.files).toContain(`${projectName}.csproj`);
-        expect(result.files.some(f => f.endsWith('.xaml'))).toBe(true);
-        expect(result.files.some(f => f.endsWith('.cs'))).toBe(true);
-        
+        expect(result.files.some((f) => f.endsWith(".xaml"))).toBe(true);
+        expect(result.files.some((f) => f.endsWith(".cs"))).toBe(true);
+
         // Verify .csproj is valid XML
-        const csprojContent = await readFile(result.projectPath, `${projectName}.csproj`);
+        const csprojContent = await readFile(
+          result.projectPath,
+          `${projectName}.csproj`,
+        );
         expect(() => parseXml(csprojContent)).not.toThrow();
-      }
+      },
     ),
-    { numRuns: 100 }
+    { numRuns: 100 },
   );
 });
 ```
@@ -718,6 +733,7 @@ test('scaffold creates complete valid projects', async () => {
 ### Unit Testing Strategy
 
 **Test Organization**:
+
 - `DotNetRuntimeProvider.test.ts`: Core provider functionality
 - `TemplateManager.test.ts`: Template loading and instantiation
 - `ExecutionKernel.test.ts`: Command execution and security
@@ -792,36 +808,47 @@ test('scaffold creates complete valid projects', async () => {
 
 ```typescript
 // Valid project name generator
-const projectNameArb = fc.string({ minLength: 1, maxLength: 50 })
-  .filter(name => /^[a-zA-Z][a-zA-Z0-9_]*$/.test(name));
+const projectNameArb = fc
+  .string({ minLength: 1, maxLength: 50 })
+  .filter((name) => /^[a-zA-Z][a-zA-Z0-9_]*$/.test(name));
 
 // Framework type generator
-const frameworkArb = fc.constantFrom('WPF', 'WinUI3', 'WinForms');
+const frameworkArb = fc.constantFrom("WPF", "WinUI3", "WinForms");
 
 // Valid XAML content generator
-const xamlContentArb = fc.record({
-  rootElement: fc.constantFrom('Window', 'Page', 'UserControl'),
-  children: fc.array(fc.constantFrom('Button', 'TextBox', 'Grid', 'StackPanel'))
-}).map(generateXamlFromStructure);
+const xamlContentArb = fc
+  .record({
+    rootElement: fc.constantFrom("Window", "Page", "UserControl"),
+    children: fc.array(
+      fc.constantFrom("Button", "TextBox", "Grid", "StackPanel"),
+    ),
+  })
+  .map(generateXamlFromStructure);
 
 // Valid C# code generator
-const csharpCodeArb = fc.record({
-  className: projectNameArb,
-  methods: fc.array(fc.record({
-    name: fc.string({ minLength: 1, maxLength: 30 }),
-    returnType: fc.constantFrom('void', 'string', 'int', 'bool')
-  }))
-}).map(generateCSharpFromStructure);
+const csharpCodeArb = fc
+  .record({
+    className: projectNameArb,
+    methods: fc.array(
+      fc.record({
+        name: fc.string({ minLength: 1, maxLength: 30 }),
+        returnType: fc.constantFrom("void", "string", "int", "bool"),
+      }),
+    ),
+  })
+  .map(generateCSharpFromStructure);
 ```
 
 ### Mocking Strategy
 
 **Mock External Dependencies**:
+
 - Mock ExecutionKernel for tests that don't need real dotnet CLI
 - Mock file system for template tests
 - Mock process manager for tests that don't need real processes
 
 **Real Integration Tests**:
+
 - Use real dotnet CLI for integration tests
 - Use real file system for end-to-end tests
 - Use real processes for application execution tests
@@ -829,10 +856,12 @@ const csharpCodeArb = fc.record({
 ### Continuous Testing
 
 **Pre-commit Hooks**:
+
 - Run unit tests
 - Run fast property tests (10 iterations for speed)
 
 **CI Pipeline**:
+
 - Run full unit test suite
 - Run full property test suite (100+ iterations)
 - Run integration tests
@@ -842,12 +871,14 @@ const csharpCodeArb = fc.record({
 ### Performance Testing
 
 **Benchmarks**:
+
 - Scaffold time: < 2 seconds
 - Restore time: < 10 seconds (network dependent)
 - Build time: < 5 seconds for small projects
 - Application startup: < 3 seconds
 
 **Load Testing**:
+
 - Multiple concurrent projects
 - Large projects (100+ files)
 - Rapid edit-rebuild cycles

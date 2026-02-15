@@ -1,6 +1,6 @@
 /**
  * TemplateManager - Manages framework-specific templates for .NET project scaffolding
- * 
+ *
  * This class handles loading, instantiation, and placeholder replacement for
  * WPF, WinUI3, and WinForms project templates.
  */
@@ -64,16 +64,18 @@ export class TemplateManager {
   instantiateTemplate(
     template: Template,
     projectName: string,
-    namespace?: string
+    namespace?: string,
   ): InstantiatedTemplate {
     const ns = namespace || projectName;
     const safeProjectName = this.sanitizeProjectName(projectName);
 
-    const instantiatedFiles: InstantiatedFile[] = template.files.map((file) => ({
-      path: this.replacePlaceholders(file.path, safeProjectName, ns),
-      content: this.replacePlaceholders(file.content, safeProjectName, ns),
-      type: file.type,
-    }));
+    const instantiatedFiles: InstantiatedFile[] = template.files.map(
+      (file) => ({
+        path: this.replacePlaceholders(file.path, safeProjectName, ns),
+        content: this.replacePlaceholders(file.content, safeProjectName, ns),
+        type: file.type,
+      }),
+    );
 
     return {
       framework: template.framework,
@@ -94,7 +96,7 @@ export class TemplateManager {
   private replacePlaceholders(
     content: string,
     projectName: string,
-    namespace: string
+    namespace: string,
   ): string {
     return content
       .replace(/\{\{ProjectName\}\}/g, projectName)
@@ -229,7 +231,10 @@ public partial class MainWindow : Window
       outputType: "WinExe",
       packageReferences: [
         { name: "Microsoft.WindowsAppSDK", version: "1.5.240627000" },
-        { name: "Microsoft.Windows.SDK.BuildTools", version: "10.0.22621.3233" },
+        {
+          name: "Microsoft.Windows.SDK.BuildTools",
+          version: "10.0.22621.3233",
+        },
       ],
       files: [
         {

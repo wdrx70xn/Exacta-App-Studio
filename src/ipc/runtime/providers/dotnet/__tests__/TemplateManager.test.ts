@@ -1,11 +1,11 @@
 /**
  * Unit tests for TemplateManager
- * 
+ *
  * Tests template loading, instantiation, and placeholder replacement
  * for WPF, WinUI3, and WinForms frameworks.
  */
 
-import { describe, expect, it, } from "vitest";
+import { describe, expect, it } from "vitest";
 import { templateManager } from "../TemplateManager";
 
 describe("TemplateManager", () => {
@@ -68,14 +68,17 @@ describe("TemplateManager", () => {
   describe("Template Instantiation", () => {
     it("should instantiate WPF template with project name", () => {
       const template = templateManager.getTemplate("wpf")!;
-      const instantiated = templateManager.instantiateTemplate(template, "MyApp");
+      const instantiated = templateManager.instantiateTemplate(
+        template,
+        "MyApp",
+      );
 
       expect(instantiated.framework).toBe("WPF");
       expect(instantiated.files.length).toBeGreaterThan(0);
 
       // Check that files have correct paths
       const csprojFile = instantiated.files.find((f) =>
-        f.path.endsWith(".csproj")
+        f.path.endsWith(".csproj"),
       );
       expect(csprojFile).toBeDefined();
       expect(csprojFile?.path).toBe("MyApp.csproj");
@@ -83,7 +86,10 @@ describe("TemplateManager", () => {
 
     it("should replace {{ProjectName}} placeholder", () => {
       const template = templateManager.getTemplate("wpf")!;
-      const instantiated = templateManager.instantiateTemplate(template, "MyApp");
+      const instantiated = templateManager.instantiateTemplate(
+        template,
+        "MyApp",
+      );
 
       // Check no unreplaced placeholders
       for (const file of instantiated.files) {
@@ -93,7 +99,7 @@ describe("TemplateManager", () => {
 
       // Check content has the project name
       const mainWindow = instantiated.files.find((f) =>
-        f.path.includes("MainWindow.xaml")
+        f.path.includes("MainWindow.xaml"),
       );
       expect(mainWindow?.content).toContain("MyApp");
     });
@@ -103,7 +109,7 @@ describe("TemplateManager", () => {
       const instantiated = templateManager.instantiateTemplate(
         template,
         "MyApp",
-        "MyCompany.MyProduct"
+        "MyCompany.MyProduct",
       );
 
       const appCs = instantiated.files.find((f) => f.path === "App.xaml.cs");
@@ -113,7 +119,10 @@ describe("TemplateManager", () => {
 
     it("should use project name as default namespace when not provided", () => {
       const template = templateManager.getTemplate("wpf")!;
-      const instantiated = templateManager.instantiateTemplate(template, "MyApp");
+      const instantiated = templateManager.instantiateTemplate(
+        template,
+        "MyApp",
+      );
 
       const appCs = instantiated.files.find((f) => f.path === "App.xaml.cs");
       expect(appCs?.content).toContain("namespace MyApp");
@@ -121,7 +130,10 @@ describe("TemplateManager", () => {
 
     it("should replace {{TargetFramework}} placeholder", () => {
       const template = templateManager.getTemplate("wpf")!;
-      const instantiated = templateManager.instantiateTemplate(template, "MyApp");
+      const instantiated = templateManager.instantiateTemplate(
+        template,
+        "MyApp",
+      );
 
       const csproj = instantiated.files.find((f) => f.path.endsWith(".csproj"));
       expect(csproj?.content).toContain("net8.0-windows");
@@ -130,22 +142,28 @@ describe("TemplateManager", () => {
 
     it("should instantiate WinUI3 template with correct package references", () => {
       const template = templateManager.getTemplate("winui3")!;
-      const instantiated = templateManager.instantiateTemplate(template, "MyApp");
+      const instantiated = templateManager.instantiateTemplate(
+        template,
+        "MyApp",
+      );
 
       expect(instantiated.packageReferences.length).toBeGreaterThan(0);
       expect(
         instantiated.packageReferences.some((p) =>
-          p.name.includes("WindowsAppSDK")
-        )
+          p.name.includes("WindowsAppSDK"),
+        ),
       ).toBe(true);
     });
 
     it("should include app.manifest for WinUI3", () => {
       const template = templateManager.getTemplate("winui3")!;
-      const instantiated = templateManager.instantiateTemplate(template, "MyApp");
+      const instantiated = templateManager.instantiateTemplate(
+        template,
+        "MyApp",
+      );
 
       const manifest = instantiated.files.find((f) =>
-        f.path.endsWith(".manifest")
+        f.path.endsWith(".manifest"),
       );
       expect(manifest).toBeDefined();
       expect(manifest?.type).toBe("manifest");
@@ -155,7 +173,7 @@ describe("TemplateManager", () => {
       const template = templateManager.getTemplate("winforms")!;
       const instantiated = templateManager.instantiateTemplate(
         template,
-        "MyFormsApp"
+        "MyFormsApp",
       );
 
       expect(instantiated.files.length).toBe(3); // csproj, Program.cs, Form1.cs
@@ -173,7 +191,7 @@ describe("TemplateManager", () => {
       const template = templateManager.getTemplate("console")!;
       const instantiated = templateManager.instantiateTemplate(
         template,
-        "MyConsoleApp"
+        "MyConsoleApp",
       );
 
       expect(instantiated.outputType).toBe("Exe");
@@ -255,7 +273,7 @@ describe("TemplateManager", () => {
       expect(template.packageReferences.length).toBe(2);
 
       const winAppSdk = template.packageReferences.find((p) =>
-        p.name.includes("WindowsAppSDK")
+        p.name.includes("WindowsAppSDK"),
       );
       expect(winAppSdk).toBeDefined();
       expect(winAppSdk?.version).toBeDefined();
