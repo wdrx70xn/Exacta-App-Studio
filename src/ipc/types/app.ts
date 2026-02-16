@@ -261,6 +261,21 @@ export const AppSearchResultSchema = z.object({
   matchedChatMessage: z.string().nullable(),
 });
 
+/**
+ * Schema for export app params.
+ */
+export const ExportAppParamsSchema = z.object({
+  appId: z.number(),
+});
+
+/**
+ * Schema for export app result.
+ */
+export const ExportAppResultSchema = z.object({
+  filePath: z.string().nullable(),
+  aborted: z.boolean(),
+});
+
 // =============================================================================
 // App Contracts
 // =============================================================================
@@ -384,6 +399,12 @@ export const appContracts = {
     channel: "update-app-commands",
     input: UpdateAppCommandsParamsSchema,
     output: z.void(),
+  }),
+
+  exportApp: defineContract({
+    channel: "export-app",
+    input: ExportAppParamsSchema,
+    output: ExportAppResultSchema,
   }),
 } as const;
 

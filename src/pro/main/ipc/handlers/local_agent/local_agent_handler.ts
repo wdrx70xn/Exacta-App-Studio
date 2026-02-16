@@ -51,6 +51,7 @@ import {
   FileEditTracker,
 } from "./tools/types";
 import { sendTelemetryEvent } from "@/ipc/utils/telemetry";
+import { getContextOverflowMessage } from "@/shared/texts";
 import {
   prepareStepMessages,
   type InjectedMessage,
@@ -66,8 +67,11 @@ import {
   isChatPendingCompaction,
   performCompaction,
   checkAndMarkForCompaction,
+  markChatForCompaction,
 } from "@/ipc/handlers/compaction/compaction_handler";
 import { getPostCompactionMessages } from "@/ipc/handlers/compaction/compaction_utils";
+import { generateProblemReport } from "@/ipc/processors/tsc";
+import { createProblemFixPrompt } from "@/shared/problem_prompt";
 
 const logger = log.scope("local_agent_handler");
 
@@ -310,219 +314,267 @@ export async function handleLocalAgentStream(
     const messageHistory: ModelMessage[] = messageOverride
       ? messageOverride
       : relevantMessages
-          .filter((msg) => msg.content || msg.aiMessagesJson)
-          .flatMap((msg) => parseAiMessagesJson(msg));
+        .filter((msg) => msg.content || msg.aiMessagesJson)
+        .flatMap((msg) => parseAiMessagesJson(msg));
 
-    // Stream the response
-    const streamResult = streamText({
-      model: modelClient.model,
-      headers: getAiHeaders({
-        builtinProviderId: modelClient.builtinProviderId,
-      }),
-      providerOptions: getProviderOptions({
-        dyadAppId: chat.app.id,
-        dyadRequestId,
-        dyadDisableFiles: true, // Local agent uses tools, not file injection
-        files: [],
-        mentionedAppsCodebases: [],
-        builtinProviderId: modelClient.builtinProviderId,
-        settings,
-      }),
-      maxOutputTokens: await getMaxTokens(settings.selectedModel),
-      temperature: await getTemperature(settings.selectedModel),
-      maxRetries: 2,
-      system: systemPrompt,
-      messages: messageHistory,
-      tools: allTools,
-      stopWhen: [
-        stepCountIs(25),
-        hasToolCall(addIntegrationTool.name),
-        // In plan mode, stop immediately after presenting a questionnaire,
-        // writing a plan, or exiting plan mode so the agent yields control
-        // back to the user. Without this, some models (e.g. Gemini Pro 3)
-        // ignore the prompt-level "STOP" instruction and keep calling tools
-        // in a loop.
-        ...(planModeOnly
-          ? [
+    // Auto-fix loop state
+    let loopMessageHistory = messageHistory;
+    let autoFixAttempts = 0;
+
+    while (true) {
+      let currentTurnResponse = "";
+
+      // Stream the response
+      const streamResult = streamText({
+        model: modelClient.model,
+        headers: getAiHeaders({
+          builtinProviderId: modelClient.builtinProviderId,
+        }),
+        providerOptions: getProviderOptions({
+          dyadAppId: chat.app.id,
+          dyadRequestId,
+          dyadDisableFiles: true, // Local agent uses tools, not file injection
+          files: [],
+          mentionedAppsCodebases: [],
+          builtinProviderId: modelClient.builtinProviderId,
+          settings,
+        }),
+        maxOutputTokens: await getMaxTokens(settings.selectedModel),
+        temperature: await getTemperature(settings.selectedModel),
+        maxRetries: 2,
+        system: systemPrompt,
+        messages: loopMessageHistory,
+        tools: allTools,
+        stopWhen: [
+          stepCountIs(25),
+          hasToolCall(addIntegrationTool.name),
+          // In plan mode, stop immediately after presenting a questionnaire,
+          // writing a plan, or exiting plan mode so the agent yields control
+          // back to the user. Without this, some models (e.g. Gemini Pro 3)
+          // ignore the prompt-level "STOP" instruction and keep calling tools
+          // in a loop.
+          ...(planModeOnly
+            ? [
               hasToolCall(planningQuestionnaireTool.name),
               hasToolCall(writePlanTool.name),
               hasToolCall(exitPlanTool.name),
             ]
-          : []),
-      ],
-      abortSignal: abortController.signal,
-      // Inject pending user messages (e.g., images from web_crawl) between steps
-      // We must re-inject all accumulated messages each step because the AI SDK
-      // doesn't persist dynamically injected messages in its internal state.
-      // We track the insertion index so messages appear at the same position each step.
-      prepareStep: (options) =>
-        prepareStepMessages(options, pendingUserMessages, allInjectedMessages),
-      onFinish: async (response) => {
-        const totalTokens = response.usage?.totalTokens;
-        const inputTokens = response.usage?.inputTokens;
-        const cachedInputTokens = response.usage?.cachedInputTokens;
-        logger.log(
-          "Total tokens used:",
-          totalTokens,
-          "Input tokens:",
-          inputTokens,
-          "Cached input tokens:",
-          cachedInputTokens,
-          "Cache hit ratio:",
-          cachedInputTokens ? (cachedInputTokens ?? 0) / (inputTokens ?? 0) : 0,
-        );
-        if (typeof totalTokens === "number") {
+            : []),
+        ],
+        abortSignal: abortController.signal,
+        // Inject pending user messages (e.g., images from web_crawl) between steps
+        // We must re-inject all accumulated messages each step because the AI SDK
+        // doesn't persist dynamically injected messages in its internal state.
+        // We track the insertion index so messages appear at the same position each step.
+        prepareStep: (options) =>
+          prepareStepMessages(options, pendingUserMessages, allInjectedMessages),
+        onFinish: async (response) => {
+          const totalTokens = response.usage?.totalTokens;
+          const inputTokens = response.usage?.inputTokens;
+          const cachedInputTokens = response.usage?.cachedInputTokens;
+          logger.log(
+            "Total tokens used:",
+            totalTokens,
+            "Input tokens:",
+            inputTokens,
+            "Cached input tokens:",
+            cachedInputTokens,
+            "Cache hit ratio:",
+            cachedInputTokens ? (cachedInputTokens ?? 0) / (inputTokens ?? 0) : 0,
+          );
+          if (typeof totalTokens === "number") {
+            await db
+              .update(messages)
+              .set({ maxTokensUsed: totalTokens })
+              .where(eq(messages.id, placeholderMessageId))
+              .catch((err) => logger.error("Failed to save token count", err));
+
+            // Check if compaction should be triggered for the next message
+            await checkAndMarkForCompaction(req.chatId, totalTokens);
+          }
+        },
+        onError: (error: any) => {
+          const errorMessage = error?.error?.message || JSON.stringify(error);
+          logger.error("Local agent stream error:", errorMessage);
+
+          // Check for context overflow and show a friendly message
+          const contextOverflowMsg = getContextOverflowMessage(errorMessage);
+          safeSend(event.sender, "chat:response:error", {
+            chatId: req.chatId,
+            error: contextOverflowMsg || `AI error: ${errorMessage}`,
+          });
+        },
+      });
+
+      // Process the stream
+      let inThinkingBlock = false;
+
+      for await (const part of streamResult.fullStream) {
+        if (abortController.signal.aborted) {
+          logger.log(`Stream aborted for chat ${req.chatId}`);
+          // Clean up pending consent requests to prevent stale UI banners
+          clearPendingConsentsForChat(req.chatId);
+          break;
+        }
+
+        let chunk = "";
+
+        // Handle thinking block transitions
+        if (
+          inThinkingBlock &&
+          !["reasoning-delta", "reasoning-end", "reasoning-start"].includes(
+            part.type,
+          )
+        ) {
+          chunk = "</think>\n";
+          inThinkingBlock = false;
+        }
+
+        switch (part.type) {
+          case "text-delta":
+            chunk += part.text;
+            break;
+
+          case "reasoning-start":
+            if (!inThinkingBlock) {
+              chunk = "<think>";
+              inThinkingBlock = true;
+            }
+            break;
+
+          case "reasoning-delta":
+            if (!inThinkingBlock) {
+              chunk = "<think>";
+              inThinkingBlock = true;
+            }
+            chunk += part.text;
+            break;
+
+          case "reasoning-end":
+            if (inThinkingBlock) {
+              chunk = "</think>\n";
+              inThinkingBlock = false;
+            }
+            break;
+
+          case "tool-input-start": {
+            // Initialize streaming state for this tool call
+            getOrCreateStreamingEntry(part.id, part.toolName);
+            break;
+          }
+
+          case "tool-input-delta": {
+            // Accumulate args and stream XML preview
+            const entry = getOrCreateStreamingEntry(part.id);
+            if (entry) {
+              entry.argsAccumulated += part.delta;
+              const toolDef = findToolDefinition(entry.toolName);
+              if (toolDef?.buildXml) {
+                const argsPartial = parsePartialJson(entry.argsAccumulated);
+                const xml = toolDef.buildXml(argsPartial, false);
+                if (xml) {
+                  ctx.onXmlStream(xml);
+                }
+              }
+            }
+            break;
+          }
+
+          case "tool-input-end": {
+            // Build final XML and persist
+            const entry = getOrCreateStreamingEntry(part.id);
+            if (entry) {
+              const toolDef = findToolDefinition(entry.toolName);
+              if (toolDef?.buildXml) {
+                const argsPartial = parsePartialJson(entry.argsAccumulated);
+                const xml = toolDef.buildXml(argsPartial, true);
+                if (xml) {
+                  ctx.onXmlComplete(xml);
+                }
+              }
+            }
+            cleanupStreamingEntry(part.id);
+            break;
+          }
+
+          case "tool-call":
+            // Tool execution happens via execute callbacks
+            break;
+
+          case "tool-result":
+            // Tool results are already handled by the execute callback
+            break;
+        }
+
+        if (chunk) {
+          currentTurnResponse += chunk;
+          fullResponse += chunk;
+          await updateResponseInDb(placeholderMessageId, fullResponse);
+          sendResponseChunk(
+            event,
+            req.chatId,
+            chat,
+            fullResponse,
+            placeholderMessageId,
+          );
+        }
+      }
+
+      // Close thinking block if still open
+      if (inThinkingBlock) {
+        const thinkClose = "</think>\n";
+        currentTurnResponse += thinkClose;
+        fullResponse += thinkClose;
+        await updateResponseInDb(placeholderMessageId, fullResponse);
+      }
+
+      // Save the AI SDK messages for multi-turn tool call preservation
+      try {
+        const response = await streamResult.response;
+        const aiMessagesJson = getAiMessagesJsonIfWithinLimit(response.messages);
+        if (aiMessagesJson) {
           await db
             .update(messages)
-            .set({ maxTokensUsed: totalTokens })
-            .where(eq(messages.id, placeholderMessageId))
-            .catch((err) => logger.error("Failed to save token count", err));
-
-          // Check if compaction should be triggered for the next message
-          await checkAndMarkForCompaction(req.chatId, totalTokens);
+            .set({ aiMessagesJson })
+            .where(eq(messages.id, placeholderMessageId));
         }
-      },
-      onError: (error: any) => {
-        const errorMessage = error?.error?.message || JSON.stringify(error);
-        logger.error("Local agent stream error:", errorMessage);
-        safeSend(event.sender, "chat:response:error", {
-          chatId: req.chatId,
-          error: `AI error: ${errorMessage}`,
+      } catch (err) {
+        logger.warn("Failed to save AI messages JSON:", err);
+      }
+
+      if (abortController.signal.aborted) break;
+
+      // === Auto-Fix Loop Logic ===
+      if (!readOnly && !planModeOnly && settings.enableAutoFixProblems) {
+        const problemReport = await generateProblemReport({
+          fullResponse: "", // unused by worker
+          appPath,
         });
-      },
-    });
 
-    // Process the stream
-    let inThinkingBlock = false;
+        if (problemReport.problems.length > 0 && autoFixAttempts < 2) {
+          autoFixAttempts++;
+          const fixPrompt = createProblemFixPrompt(problemReport);
 
-    for await (const part of streamResult.fullStream) {
-      if (abortController.signal.aborted) {
-        logger.log(`Stream aborted for chat ${req.chatId}`);
-        // Clean up pending consent requests to prevent stale UI banners
-        clearPendingConsentsForChat(req.chatId);
-        break;
-      }
+          logger.info(
+            `Auto-fix attempt #${autoFixAttempts}: Found ${problemReport.problems.length} problems`,
+          );
 
-      let chunk = "";
+          // Show visible status to user
+          ctx.onXmlStream(
+            `<dyad-status title="Auto-fixing ${problemReport.problems.length} issues (Attempt ${autoFixAttempts}/2)..."></dyad-status>`,
+          );
 
-      // Handle thinking block transitions
-      if (
-        inThinkingBlock &&
-        !["reasoning-delta", "reasoning-end", "reasoning-start"].includes(
-          part.type,
-        )
-      ) {
-        chunk = "</think>\n";
-        inThinkingBlock = false;
-      }
+          // Update history for next iteration
+          loopMessageHistory = [
+            ...loopMessageHistory,
+            { role: "assistant", content: currentTurnResponse },
+            { role: "user", content: fixPrompt },
+          ];
 
-      switch (part.type) {
-        case "text-delta":
-          chunk += part.text;
-          break;
-
-        case "reasoning-start":
-          if (!inThinkingBlock) {
-            chunk = "<think>";
-            inThinkingBlock = true;
-          }
-          break;
-
-        case "reasoning-delta":
-          if (!inThinkingBlock) {
-            chunk = "<think>";
-            inThinkingBlock = true;
-          }
-          chunk += part.text;
-          break;
-
-        case "reasoning-end":
-          if (inThinkingBlock) {
-            chunk = "</think>\n";
-            inThinkingBlock = false;
-          }
-          break;
-
-        case "tool-input-start": {
-          // Initialize streaming state for this tool call
-          getOrCreateStreamingEntry(part.id, part.toolName);
-          break;
+          continue;
         }
-
-        case "tool-input-delta": {
-          // Accumulate args and stream XML preview
-          const entry = getOrCreateStreamingEntry(part.id);
-          if (entry) {
-            entry.argsAccumulated += part.delta;
-            const toolDef = findToolDefinition(entry.toolName);
-            if (toolDef?.buildXml) {
-              const argsPartial = parsePartialJson(entry.argsAccumulated);
-              const xml = toolDef.buildXml(argsPartial, false);
-              if (xml) {
-                ctx.onXmlStream(xml);
-              }
-            }
-          }
-          break;
-        }
-
-        case "tool-input-end": {
-          // Build final XML and persist
-          const entry = getOrCreateStreamingEntry(part.id);
-          if (entry) {
-            const toolDef = findToolDefinition(entry.toolName);
-            if (toolDef?.buildXml) {
-              const argsPartial = parsePartialJson(entry.argsAccumulated);
-              const xml = toolDef.buildXml(argsPartial, true);
-              if (xml) {
-                ctx.onXmlComplete(xml);
-              }
-            }
-          }
-          cleanupStreamingEntry(part.id);
-          break;
-        }
-
-        case "tool-call":
-          // Tool execution happens via execute callbacks
-          break;
-
-        case "tool-result":
-          // Tool results are already handled by the execute callback
-          break;
       }
-
-      if (chunk) {
-        fullResponse += chunk;
-        await updateResponseInDb(placeholderMessageId, fullResponse);
-        sendResponseChunk(
-          event,
-          req.chatId,
-          chat,
-          fullResponse,
-          placeholderMessageId,
-        );
-      }
-    }
-
-    // Close thinking block if still open
-    if (inThinkingBlock) {
-      fullResponse += "</think>\n";
-      await updateResponseInDb(placeholderMessageId, fullResponse);
-    }
-
-    // Save the AI SDK messages for multi-turn tool call preservation
-    try {
-      const response = await streamResult.response;
-      const aiMessagesJson = getAiMessagesJsonIfWithinLimit(response.messages);
-      if (aiMessagesJson) {
-        await db
-          .update(messages)
-          .set({ aiMessagesJson })
-          .where(eq(messages.id, placeholderMessageId));
-      }
-    } catch (err) {
-      logger.warn("Failed to save AI messages JSON:", err);
+      break;
     }
 
     // In read-only and plan mode, skip deploys and commits
@@ -580,6 +632,48 @@ export async function handleLocalAgentStream(
           .where(eq(messages.id, placeholderMessageId));
       }
       return false; // Cancelled - don't consume quota
+    }
+
+    // Check if this is a context overflow error — auto-compact and retry
+    const errorStr = String(error);
+    const isContextOverflow = getContextOverflowMessage(errorStr) !== null;
+
+    if (isContextOverflow) {
+      logger.warn(
+        `Context overflow detected for chat ${req.chatId}. Triggering auto-compaction and retry...`,
+      );
+
+      try {
+        // Mark for compaction and retry — the recursive call will
+        // detect pendingCompaction at the top and run performCompaction()
+        // before re-sending the request with reduced context
+        await markChatForCompaction(req.chatId);
+
+        // Retry with a fresh abort controller (the original stream is dead)
+        const retryAbortController = new AbortController();
+        return await handleLocalAgentStream(
+          event,
+          req,
+          retryAbortController,
+          {
+            placeholderMessageId,
+            systemPrompt,
+            dyadRequestId,
+            readOnly,
+            planModeOnly,
+            messageOverride,
+          },
+        );
+      } catch (retryError) {
+        logger.error("Auto-compaction retry failed:", retryError);
+        safeSend(event.sender, "chat:response:error", {
+          chatId: req.chatId,
+          error:
+            getContextOverflowMessage(String(retryError)) ||
+            `Error: ${retryError}`,
+        });
+        return false;
+      }
     }
 
     logger.error("Local agent error:", error);

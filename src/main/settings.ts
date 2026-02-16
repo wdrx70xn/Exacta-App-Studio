@@ -31,7 +31,7 @@ const DEFAULT_SETTINGS: UserSettings = {
   enableProLazyEditsMode: true,
   enableProSmartFilesContextMode: true,
   selectedChatMode: "build",
-  enableAutoFixProblems: false,
+  enableAutoFixProblems: true,
   enableAutoUpdate: true,
   releaseChannel: "stable",
   selectedTemplateId: DEFAULT_TEMPLATE_ID,

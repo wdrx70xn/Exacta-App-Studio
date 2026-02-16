@@ -1,8 +1,10 @@
 import { spawn } from "child_process";
 import fs from "fs";
 import path from "path";
+import os from "os";
 import logger from "electron-log";
 import type { NetworkPolicy, QuotaExceededEvent } from "../types/guardian";
+import { getDyadAppsBaseDirectory } from "../../paths/paths";
 
 // Job Registry for tracking active jobs and sessions
 class JobRegistry {
@@ -41,11 +43,11 @@ class JobRegistry {
 
   getJob(jobId: string):
     | {
-        jobId: string;
-        appId: number;
-        createdAt: Date;
-        mode: "ephemeral" | "session";
-      }
+      jobId: string;
+      appId: number;
+      createdAt: Date;
+      mode: "ephemeral" | "session";
+    }
     | undefined {
     return this.jobs.get(jobId);
   }
@@ -166,8 +168,22 @@ export class ExecutionKernel {
   ]);
 
   private readonly TRUSTED_PATHS: Record<string, (string | undefined)[]> = {
-    npm: [process.env.APPDATA, process.env.LOCALAPPDATA],
-    pnpm: [process.env.APPDATA, process.env.LOCALAPPDATA],
+    npm: [
+      process.env.APPDATA,
+      process.env.LOCALAPPDATA,
+      process.env.APPDATA ? path.join(process.env.APPDATA, "npm") : undefined,
+      path.join(os.homedir(), "AppData", "Roaming", "npm"),
+      process.env.PROGRAMFILES,
+      process.env["PROGRAMFILES(X86)"],
+    ],
+    pnpm: [
+      process.env.APPDATA,
+      process.env.LOCALAPPDATA,
+      process.env.APPDATA ? path.join(process.env.APPDATA, "npm") : undefined,
+      path.join(os.homedir(), "AppData", "Roaming", "npm"),
+      process.env.PROGRAMFILES,
+      process.env["PROGRAMFILES(X86)"],
+    ],
     dotnet: [process.env.PROGRAMFILES, process.env["PROGRAMFILES(X86)"]],
     git: [process.env.PROGRAMFILES, process.env["PROGRAMFILES(X86)"]],
     node: [process.env.PROGRAMFILES, process.env["PROGRAMFILES(X86)"]],
@@ -175,7 +191,7 @@ export class ExecutionKernel {
 
   private activeProcesses: Map<string, any> = new Map();
 
-  private constructor() {}
+  private constructor() { }
 
   static getInstance(): ExecutionKernel {
     if (!ExecutionKernel.instance) {
@@ -186,11 +202,70 @@ export class ExecutionKernel {
 
   /**
    * Hardened path validation using realpath enforcement
+   * Handles both existing and non-existing paths (for app creation)
+   * Falls back gracefully if realpath fails
    */
   private async validatePath(cwd: string, appId: number): Promise<void> {
     try {
-      // Get canonical path using realpath
-      const canonicalCwd = await fs.promises.realpath(cwd);
+      // Normalize the path first (handles spaces and relative paths)
+      const normalizedCwd = path.normalize(cwd);
+
+      // Security check: prevent path traversal
+      if (normalizedCwd.includes("..")) {
+        throw new Error("Path traversal detected");
+      }
+
+      // Try to get canonical path, but fall back to normalized if it fails
+      let pathToValidate = normalizedCwd;
+      let canonicalPath: string;
+
+      if (fs.existsSync(normalizedCwd)) {
+        // Path exists - try to get canonical path using realpath
+        try {
+          canonicalPath = await fs.promises.realpath(normalizedCwd);
+          pathToValidate = canonicalPath;
+        } catch (realpathError) {
+          // Realpath failed (permissions, symlink issues, etc.)
+          // Fall back to using normalized path
+          logger.warn(
+            `realpath failed for ${normalizedCwd}, using normalized path instead:`,
+            realpathError,
+          );
+          canonicalPath = normalizedCwd;
+          pathToValidate = normalizedCwd;
+        }
+      } else {
+        // Path doesn't exist yet (app is being created)
+        // Validate the parent directory instead
+        const parentDir = path.dirname(normalizedCwd);
+        if (!fs.existsSync(parentDir)) {
+          throw new Error(
+            `Parent directory does not exist: ${parentDir}`,
+          );
+        }
+        try {
+          canonicalPath = await fs.promises.realpath(parentDir);
+          pathToValidate = canonicalPath;
+        } catch (realpathError) {
+          // Fall back to normalized parent path
+          logger.warn(
+            `realpath failed for parent ${parentDir}, using normalized path:`,
+            realpathError,
+          );
+          canonicalPath = path.normalize(parentDir);
+          pathToValidate = canonicalPath;
+        }
+      }
+
+      // Get standard app root (modern pattern)
+      const standardAppsRoot = getDyadAppsBaseDirectory();
+      let canonicalStandardAppsRoot: string;
+      try {
+        canonicalStandardAppsRoot = await fs.promises.realpath(standardAppsRoot);
+      } catch {
+        // Fall back to normalized path if realpath fails
+        canonicalStandardAppsRoot = path.normalize(standardAppsRoot);
+      }
 
       // Get expected app root (legacy pattern)
       const legacyAppRoot = path.join(
@@ -203,40 +278,74 @@ export class ExecutionKernel {
           canonicalLegacyAppRoot = await fs.promises.realpath(legacyAppRoot);
         }
       } catch {
-        // Ignore if legacy root doesn't exist
+        // Fall back to normalized or empty
+        if (fs.existsSync(legacyAppRoot)) {
+          canonicalLegacyAppRoot = path.normalize(legacyAppRoot);
+        }
       }
-
-      // Get standard app root (modern pattern)
-      const { getDyadAppsBaseDirectory } = require("../../paths/paths");
-      const standardAppsRoot = getDyadAppsBaseDirectory();
-      const canonicalStandardAppsRoot =
-        await fs.promises.realpath(standardAppsRoot);
 
       // Get templates path
       const templatesPath = path.join(process.cwd(), "templates");
-      const canonicalTemplatesPath = await fs.promises.realpath(templatesPath);
+      let canonicalTemplatesPath = "";
+      try {
+        if (fs.existsSync(templatesPath)) {
+          canonicalTemplatesPath = await fs.promises.realpath(templatesPath);
+        }
+      } catch {
+        // Fall back to normalized or empty
+        if (fs.existsSync(templatesPath)) {
+          canonicalTemplatesPath = path.normalize(templatesPath);
+        }
+      }
 
-      // Check if cwd is within allowed paths
+      // Normalize all paths for consistent comparison - handle both separators and case
+      const normalizedPathToValidate = path.normalize(pathToValidate).toLowerCase().replace(/[\\/]/g, path.sep).replace(/[\\/]$/, '');
+      const normalizedStandardRoot = path.normalize(canonicalStandardAppsRoot).toLowerCase().replace(/[\\/]/g, path.sep).replace(/[\\/]$/, '');
+      const normalizedLegacyRoot = canonicalLegacyAppRoot
+        ? path.normalize(canonicalLegacyAppRoot).toLowerCase().replace(/[\\/]/g, path.sep).replace(/[\\/]$/, '')
+        : "";
+      const normalizedTemplatesPath = canonicalTemplatesPath
+        ? path.normalize(canonicalTemplatesPath).toLowerCase().replace(/[\\/]/g, path.sep).replace(/[\\/]$/, '')
+        : "";
+
+      logger.debug(`Path validation details:
+        Original cwd: ${cwd}
+        Path to validate: ${pathToValidate}
+        Normalized (lower): ${normalizedPathToValidate}
+        Standard root: ${canonicalStandardAppsRoot}
+        Normalized standard root (lower): ${normalizedStandardRoot}
+        Legacy root: ${canonicalLegacyAppRoot}
+        Normalized legacy root (lower): ${normalizedLegacyRoot}
+        Templates path: ${canonicalTemplatesPath}
+        Normalized templates path (lower): ${normalizedTemplatesPath}`);
+
+      // Check if path is within allowed directories (case-insensitive, separator-agnostic)
       const isInLegacyAppRoot =
-        canonicalLegacyAppRoot &&
-        canonicalCwd.startsWith(canonicalLegacyAppRoot);
-      const isInStandardAppsRoot = canonicalCwd.startsWith(
-        canonicalStandardAppsRoot,
+        normalizedLegacyRoot &&
+        normalizedPathToValidate.startsWith(normalizedLegacyRoot);
+      const isInStandardAppsRoot = normalizedPathToValidate.startsWith(
+        normalizedStandardRoot,
       );
-      const isInTemplates = canonicalCwd.startsWith(canonicalTemplatesPath);
+      const isInTemplates =
+        normalizedTemplatesPath && normalizedPathToValidate.startsWith(normalizedTemplatesPath);
+
+      logger.debug(`Validation results:
+        Is in standard root: ${isInStandardAppsRoot}
+        Is in legacy root: ${isInLegacyAppRoot}
+        Is in templates: ${isInTemplates}`);
 
       if (!isInLegacyAppRoot && !isInStandardAppsRoot && !isInTemplates) {
+        logger.error(`Path validation failed:
+          Checking: ${normalizedPathToValidate}
+          Standard root: ${normalizedStandardRoot}
+          Legacy root: ${normalizedLegacyRoot}
+          Templates: ${normalizedTemplatesPath}`);
         throw new Error(
           `Path validation failed: ${cwd} is not within allowed directories`,
         );
       }
 
-      // Additional security checks
-      if (canonicalCwd.includes("..")) {
-        throw new Error("Path traversal detected");
-      }
-
-      logger.info(`Path validation passed: ${canonicalCwd}`);
+      logger.info(`Path validation passed: ${normalizedCwd}`);
     } catch (error) {
       logger.error("Path validation failed:", error);
       throw new Error(`Security violation: Invalid working directory ${cwd}`);
@@ -246,18 +355,42 @@ export class ExecutionKernel {
   /**
    * Validate executable against trusted locations
    */
-  private async validateExecutable(command: string): Promise<string> {
+  private async validateExecutable(command: string, commandName?: string): Promise<string> {
+    // If commandName is not provided, extract from command
+    let normalizedCommand = commandName || command;
+    if (!commandName) {
+      // If command contains path, extract filename
+      if (normalizedCommand.includes("/") || normalizedCommand.includes("\\")) {
+        normalizedCommand = path.basename(normalizedCommand);
+        // Remove extension if present
+        normalizedCommand = normalizedCommand.replace(/\.(exe|cmd|bat)$/i, "");
+      }
+    }
+    
     // Resolve full path of command
     const fullPath = await this.resolveExecutablePath(command);
+    logger.debug(`Validating executable: command=${command}, commandName=${normalizedCommand}, path=${fullPath}`);
+    
+    // Normalize full path to lowercase for case-insensitive comparison on Windows
+    const normalizedFullPath = path.normalize(fullPath).toLowerCase();
 
     // Check against trusted paths
-    const trustedLocations = this.TRUSTED_PATHS[command] || [];
+    const trustedLocations = this.TRUSTED_PATHS[normalizedCommand] || [];
+    logger.debug(`Trusted locations for ${normalizedCommand}:`, trustedLocations);
 
     let isTrusted = false;
     for (const trustedLocation of trustedLocations) {
-      if (trustedLocation && fullPath.startsWith(trustedLocation as string)) {
-        isTrusted = true;
-        break;
+      if (trustedLocation) {
+        const normalizedLocation = path
+          .normalize(trustedLocation)
+          .toLowerCase();
+        logger.debug(`  Checking location: ${normalizedLocation}`);
+        logger.debug(`  Path starts with location: ${normalizedFullPath.startsWith(normalizedLocation)}`);
+        if (normalizedFullPath.startsWith(normalizedLocation)) {
+          isTrusted = true;
+          logger.debug(`  ✔️ Matched location: ${normalizedLocation}`);
+          break;
+        }
       }
     }
 
@@ -281,9 +414,11 @@ export class ExecutionKernel {
   private async resolveExecutablePath(command: string): Promise<string> {
     // On Windows, try .exe extension
     const extensions = [".exe", ".cmd", ".bat", ""];
+    logger.debug(`Resolving executable for command: ${command}`);
 
     for (const ext of extensions) {
       const cmdWithExt = command + ext;
+      logger.debug(`  Trying extension: ${ext}, full command: ${cmdWithExt}`);
 
       // Check if it's an absolute path
       if (path.isAbsolute(cmdWithExt)) {
@@ -458,8 +593,16 @@ export class ExecutionKernel {
       options.mode = "ephemeral";
     }
 
+    // If command contains path separators, extract just the filename
+    let commandName = kernelCommand.command;
+    if (commandName.includes("/") || commandName.includes("\\")) {
+      commandName = path.basename(commandName);
+      // Remove extension if present
+      commandName = commandName.replace(/\.(exe|cmd|bat)$/i, "");
+    }
+
     // Validate command is allowed
-    if (!this.ALLOWED_COMMANDS.has(kernelCommand.command)) {
+    if (!this.ALLOWED_COMMANDS.has(commandName)) {
       throw new Error(`Command not allowed: ${kernelCommand.command}`);
     }
 
@@ -470,9 +613,10 @@ export class ExecutionKernel {
     await this.validatePath(options.cwd, options.appId);
     const validatedCommand = await this.validateExecutable(
       kernelCommand.command,
+      commandName,
     );
     const riskLevel = this.classifyRiskAdvanced(
-      kernelCommand.command,
+      commandName,
       kernelCommand.args,
       providerName,
     );
@@ -548,8 +692,16 @@ export class ExecutionKernel {
       options.mode = "session";
     }
 
+    // Extract command name from command (handle cases with path)
+    let commandName = kernelCommand.command;
+    if (commandName.includes("/") || commandName.includes("\\")) {
+      commandName = path.basename(commandName);
+      // Remove extension if present
+      commandName = commandName.replace(/\.(exe|cmd|bat)$/i, "");
+    }
+    
     // Validate command is allowed
-    if (!this.ALLOWED_COMMANDS.has(kernelCommand.command)) {
+    if (!this.ALLOWED_COMMANDS.has(commandName)) {
       throw new Error(`Command not allowed: ${kernelCommand.command}`);
     }
 
@@ -560,9 +712,10 @@ export class ExecutionKernel {
     await this.validatePath(options.cwd, options.appId);
     const validatedCommand = await this.validateExecutable(
       kernelCommand.command,
+      commandName,
     );
     const riskLevel = this.classifyRiskAdvanced(
-      kernelCommand.command,
+      commandName,
       kernelCommand.args,
       providerName,
     );

@@ -96,7 +96,7 @@ import {
   markMessageAsUsingFreeAgentQuota,
   unmarkMessageAsUsingFreeAgentQuota,
 } from "./free_agent_quota_handlers";
-import { AI_STREAMING_ERROR_MESSAGE_PREFIX } from "@/shared/texts";
+import { AI_STREAMING_ERROR_MESSAGE_PREFIX, getContextOverflowMessage } from "@/shared/texts";
 import { getCurrentCommitHash } from "../utils/git_utils";
 import {
   processChatMessagesWithVersionedFiles as getVersionedFiles,
@@ -566,14 +566,14 @@ ${componentSnippet}
         // we handle this specially below.
         const chatContext =
           req.selectedComponents &&
-          req.selectedComponents.length > 0 &&
-          !isSmartContextEnabled
+            req.selectedComponents.length > 0 &&
+            !isSmartContextEnabled
             ? {
-                contextPaths: req.selectedComponents.map((component) => ({
-                  globPath: component.relativePath,
-                })),
-                smartContextAutoIncludes: [],
-              }
+              contextPaths: req.selectedComponents.map((component) => ({
+                globPath: component.relativePath,
+              })),
+              smartContextAutoIncludes: [],
+            }
             : validateChatContext(updatedChat.app.chatContext);
 
         // Extract codebase for current app
@@ -781,10 +781,10 @@ ${componentSnippet}
             (settings.selectedChatMode === "local-agent"
               ? ""
               : await getSupabaseContext({
-                  supabaseProjectId: updatedChat.app.supabaseProjectId,
-                  organizationSlug:
-                    updatedChat.app.supabaseOrganizationSlug ?? null,
-                }));
+                supabaseProjectId: updatedChat.app.supabaseProjectId,
+                organizationSlug:
+                  updatedChat.app.supabaseOrganizationSlug ?? null,
+              }));
         } else if (
           // Neon projects don't need Supabase.
           !updatedChat.app?.neonProjectId &&
@@ -864,32 +864,32 @@ This conversation includes one or more image attachments. When the user uploads 
 
         const codebasePrefix = isEngineEnabled
           ? // No codebase prefix if engine is set, we will take of it there.
-            []
+          []
           : ([
-              {
-                role: "user",
-                content: createCodebasePrompt(codebaseInfo),
-              },
-              {
-                role: "assistant",
-                content: "OK, got it. I'm ready to help",
-              },
-            ] as const);
+            {
+              role: "user",
+              content: createCodebasePrompt(codebaseInfo),
+            },
+            {
+              role: "assistant",
+              content: "OK, got it. I'm ready to help",
+            },
+          ] as const);
 
         // If engine is enabled, we will send the other apps codebase info to the engine
         // and process it with smart context.
         const otherCodebasePrefix =
           otherAppsCodebaseInfo && !isEngineEnabled
             ? ([
-                {
-                  role: "user",
-                  content: createOtherAppsCodebasePrompt(otherAppsCodebaseInfo),
-                },
-                {
-                  role: "assistant",
-                  content: "OK.",
-                },
-              ] as const)
+              {
+                role: "user",
+                content: createOtherAppsCodebasePrompt(otherAppsCodebaseInfo),
+              },
+              {
+                role: "assistant",
+                content: "OK.",
+              },
+            ] as const)
             : [];
 
         const limitedHistoryChatMessages = limitedMessageHistory.map((msg) => ({
@@ -1060,6 +1060,19 @@ This conversation includes one or more image attachments. When the user uploads 
               if (errorMessage && responseBody) {
                 errorMessage += "\n\nDetails: " + responseBody;
               }
+
+              // Check for context overflow and provide a friendly message
+              const contextOverflowMsg = getContextOverflowMessage(errorMessage);
+              if (contextOverflowMsg) {
+                logger.warn("Context window overflow detected, showing friendly message to user");
+                event.sender.send("chat:response:error", {
+                  chatId: req.chatId,
+                  error: contextOverflowMsg,
+                });
+                activeStreams.delete(req.chatId);
+                return;
+              }
+
               const message = errorMessage || JSON.stringify(error);
               const requestIdPrefix = isEngineEnabled
                 ? `[Request ID: ${dyadRequestId}] `
@@ -1487,11 +1500,11 @@ ${formattedSearchReplaceIssues}`,
               ) {
                 fullResponse += `<exacta-problem-report summary="${problemReport.problems.length} problems">
 ${problemReport.problems
-  .map(
-    (problem) =>
-      `<problem file="${escapeXmlAttr(problem.file)}" line="${problem.line}" column="${problem.column}" code="${problem.code}">${escapeXmlContent(problem.message)}</problem>`,
-  )
-  .join("\n")}
+                    .map(
+                      (problem) =>
+                        `<problem file="${escapeXmlAttr(problem.file)}" line="${problem.line}" column="${problem.column}" code="${problem.code}">${escapeXmlContent(problem.message)}</problem>`,
+                    )
+                    .join("\n")}
 </exacta-problem-report>`;
 
                 logger.info(

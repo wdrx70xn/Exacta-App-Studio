@@ -115,3 +115,9 @@ storybook-static/
 # .NET
 bin/
 obj/
+
+# Vite timestamps
+*.timestamp-*.mjs
+
+# Internal test scripts
+test-*.js

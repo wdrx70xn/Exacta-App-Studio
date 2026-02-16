@@ -11,6 +11,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { getDyadAppPath, getUserDataPath } from "../../paths/paths";
 import { ChildProcess, spawn } from "node:child_process";
+import archiver from "archiver";
 import { promises as fsPromises } from "node:fs";
 
 // Import our utility modules
@@ -630,8 +631,7 @@ RUN npm install -g pnpm
       .join(", ");
 
     logger.error(
-      `Failed to spawn Docker container for app ${appId}. ${details}\nSTDERR:\n${
-        errorOutput || "(empty)"
+      `Failed to spawn Docker container for app ${appId}. ${details}\nSTDERR:\n${errorOutput || "(empty)"
       }`,
     );
 
@@ -1325,7 +1325,7 @@ export function registerAppHandlers() {
         logger.error("Error storing Neon timestamp at current version:", error);
         throw new Error(
           "Could not store Neon timestamp at current version; database versioning functionality is not working: " +
-            error,
+          error,
         );
       }
     }
@@ -1978,6 +1978,77 @@ export function registerAppHandlers() {
       .where(eq(apps.id, appId));
 
     logger.info(`Updated commands for app ${appId}`);
+  });
+
+  createTypedHandler(appContracts.exportApp, async (_, params) => {
+    const { appId } = params;
+    return withLock(appId, async () => {
+      const app = await db.query.apps.findFirst({
+        where: eq(apps.id, appId),
+      });
+
+      if (!app) {
+        throw new Error("App not found");
+      }
+
+      const appPath = getDyadAppPath(app.path);
+      const appName = app.name || "app";
+
+      // Show save dialog
+      const { filePath, canceled } = await dialog.showSaveDialog({
+        title: "Export App as ZIP",
+        defaultPath: `${appName}.zip`,
+        filters: [{ name: "ZIP Files", extensions: ["zip"] }],
+      });
+
+      if (canceled || !filePath) {
+        return { filePath: null, aborted: true };
+      }
+
+      logger.info(`Exporting app ${appId} to ${filePath}`);
+
+      return new Promise((resolve, reject) => {
+        const output = fs.createWriteStream(filePath);
+        const archive = archiver("zip", {
+          zlib: { level: 9 }, // Sets the compression level.
+        });
+
+        output.on("close", () => {
+          logger.info(`App exported successfully: ${archive.pointer()} total bytes`);
+          resolve({ filePath, aborted: false });
+        });
+
+        archive.on("warning", (err) => {
+          if (err.code === "ENOENT") {
+            logger.warn("Archiver warning:", err);
+          } else {
+            reject(err);
+          }
+        });
+
+        archive.on("error", (err) => {
+          reject(err);
+        });
+
+        archive.pipe(output);
+
+        // Add files from app directory, excluding node_modules and other build artifacts
+        archive.glob("**/*", {
+          cwd: appPath,
+          ignore: [
+            "**/node_modules/**",
+            "**/.git/**",
+            "**/.dyad/**",
+            "**/dist/**",
+            "**/bin/**",
+            "**/obj/**",
+            "**/.next/**",
+          ],
+        });
+
+        archive.finalize();
+      });
+    });
   });
 
   createTypedHandler(appContracts.changeAppLocation, async (_, params) => {

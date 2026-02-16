@@ -18,8 +18,42 @@ import {
 } from "../../security/execution_kernel";
 import { getAppPort } from "../../../../shared/ports";
 import path from "node:path";
+import { execSync } from "node:child_process";
 import fs from "fs-extra";
 import { copyDirectoryRecursive } from "../../utils/file_utils";
+import logger from "electron-log";
+
+/**
+ * Check if pnpm is available on the system
+ */
+function isPnpmAvailable(): boolean {
+  try {
+    execSync("pnpm --version", { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Detect the package manager to use for an app.
+ * Prefers pnpm if pnpm-lock.yaml exists AND pnpm is installed,
+ * otherwise falls back to npm.
+ */
+async function detectPackageManager(appPath: string): Promise<"pnpm" | "npm"> {
+  const hasPnpmLock = await fs.pathExists(
+    path.join(appPath, "pnpm-lock.yaml"),
+  );
+  if (hasPnpmLock && isPnpmAvailable()) {
+    return "pnpm";
+  }
+  if (hasPnpmLock && !isPnpmAvailable()) {
+    logger.warn(
+      `App at ${appPath} has pnpm-lock.yaml but pnpm is not installed. Falling back to npm.`,
+    );
+  }
+  return "npm";
+}
 
 // Type for event handlers
 type ExecutionEventHandler = (event: {
@@ -81,12 +115,9 @@ export const nodeRuntimeProvider: RuntimeProvider = {
     appPath: string;
     appId: number;
   }): Promise<ExecutionResult> {
-    // Detect Package Manager
-    const isPnpm = await fs.pathExists(
-      path.join(options.appPath, "pnpm-lock.yaml"),
-    );
-    const pm = isPnpm ? "pnpm" : "npm";
-    const args = isPnpm ? ["install"] : ["install", "--legacy-peer-deps"];
+    // Detect Package Manager (with fallback if pnpm not installed)
+    const pm = await detectPackageManager(options.appPath);
+    const args = pm === "pnpm" ? ["install"] : ["install", "--legacy-peer-deps"];
 
     // Execute Directly (No Shell)
     return executionKernel.execute(
@@ -133,10 +164,7 @@ export const nodeRuntimeProvider: RuntimeProvider = {
     // NO SHELL: Direct execution only.
     // We expect dependencies to be resolved already.
 
-    const isPnpm = await fs.pathExists(
-      path.join(options.appPath, "pnpm-lock.yaml"),
-    );
-    const pm = isPnpm ? "pnpm" : "npm";
+    const pm = await detectPackageManager(options.appPath);
 
     // Command: [p]npm run dev -- --port X
     const args = ["run", "dev"];

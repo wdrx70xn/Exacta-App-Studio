@@ -4,6 +4,8 @@ import {
   PlusCircle,
   GitBranch,
   Info,
+  Download,
+  Loader2,
 } from "lucide-react";
 import { PanelRightClose } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -22,7 +24,7 @@ import { useRouter } from "@tanstack/react-router";
 import { selectedChatIdAtom } from "@/atoms/chatAtoms";
 import { useChats } from "@/hooks/useChats";
 import { showError, showSuccess } from "@/lib/toast";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useStreamChat } from "@/hooks/useStreamChat";
 import { useCurrentBranch } from "@/hooks/useCurrentBranch";
 import { useCheckoutVersion } from "@/hooks/useCheckoutVersion";
@@ -54,6 +56,7 @@ export function ChatHeader({
   const isAnyCheckoutVersionInProgress = useAtomValue(
     isAnyCheckoutVersionInProgressAtom,
   );
+  const [isExporting, setIsExporting] = useState(false);
 
   const {
     branchInfo,
@@ -98,6 +101,21 @@ export function ChatHeader({
       }
     } else {
       navigate({ to: "/" });
+    }
+  };
+
+  const handleExportApp = async () => {
+    if (!appId) return;
+    setIsExporting(true);
+    try {
+      const result = await ipc.app.exportApp({ appId });
+      if (!result.aborted && result.filePath) {
+        showSuccess(`App exported to ${result.filePath}`);
+      }
+    } catch (error) {
+      showError(`Failed to export app: ${(error as any).toString()}`);
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -197,6 +215,20 @@ export function ChatHeader({
           >
             <PlusCircle size={16} />
             <span>{t("newChat")}</span>
+          </Button>
+
+          <Button
+            onClick={handleExportApp}
+            variant="ghost"
+            title="Export App as ZIP"
+            disabled={isExporting}
+            className="hidden @2xs:flex items-center justify-start gap-2 mx-1 py-3"
+          >
+            {isExporting ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <Download size={16} />
+            )}
           </Button>
           <Button
             onClick={onVersionClick}

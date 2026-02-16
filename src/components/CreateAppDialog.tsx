@@ -19,7 +19,7 @@ import { NEON_TEMPLATE_IDS, Template } from "@/shared/templates";
 
 import { useRouter } from "@tanstack/react-router";
 
-import { Loader2 } from "lucide-react";
+import { Loader2, Settings2, AppWindow } from "lucide-react";
 import { neonTemplateHook } from "@/client_logic/template_hook";
 import { showError } from "@/lib/toast";
 import { useRuntimeSelector } from "./RuntimeSelector";
@@ -43,6 +43,7 @@ export function CreateAppDialog({
   const { data: nameCheckResult } = useCheckName(appName);
   const router = useRouter();
   const {
+    open: openRuntimeSelector,
     close: closeRuntimeSelector,
     selection,
     RuntimeSelector: RuntimeSelectorComponent,
@@ -128,6 +129,35 @@ export function CreateAppDialog({
                   </p>
                 )}
               </div>
+            </div>
+
+            <div className="grid gap-2">
+              <Label>Runtime & Stack</Label>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={openRuntimeSelector}
+                className="justify-start font-normal"
+              >
+                {selection ? (
+                  <div className="flex items-center gap-2">
+                    <AppWindow className="h-4 w-4" />
+                    <span>
+                      {selection.runtimeId === "dotnet"
+                        ? ".NET"
+                        : selection.runtimeId === "tauri"
+                          ? "Tauri"
+                          : "Node.js"}{" "}
+                      / {selection.stackType}
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Settings2 className="h-4 w-4" />
+                    <span>Default (Node.js / React)</span>
+                  </div>
+                )}
+              </Button>
             </div>
 
             <DialogFooter>
